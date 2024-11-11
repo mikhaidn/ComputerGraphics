@@ -1,5 +1,10 @@
 const IlliniOrange =[1, 0.373, 0.02, 1]
 
+let moveX = 0
+let moveY = 0
+let moveZ = 0
+let moveSpeed = .1
+
 /**
  * Given the source code of a vertex and fragment shader, compiles them,
  * and returns the linked program.
@@ -112,133 +117,36 @@ function supplyDataBuffer(data, loc, mode) {
 function draw(seconds) {
   
   // gl.clearColor(...[1,1,1,1]) // f(...[1,2,3]) means f(1,2,3)
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
   gl.useProgram(program)
 
   gl.bindVertexArray(octa.vao)
 
   // Render Sun
-  let VIEW_CONSTANT =1.5
-  let goodView = [2*VIEW_CONSTANT,3*VIEW_CONSTANT,2*VIEW_CONSTANT]
+  let goodView = [0,0,5]
   let V = m4view(goodView, [0,0,0], [1,0,0])
   
-  
-  // A large octahedron (the Sun)
-  // fixed at the origin
-  // spinning a full rotation once every two seconds
-  let sunRotationM = m4rotX(seconds*Math.PI)
-  gl.uniformMatrix4fv(program.uniforms.m, false, sunRotationM)
+  // Check each key
+  if (keysBeingPressed['q']) {
+      moveZ += moveSpeed  // Move deeper into screen
+  } else if (keysBeingPressed['e']) {
+      moveZ -= moveSpeed  // Move towards viewer
+  } else if (keysBeingPressed['a']) {
+      moveY += moveSpeed  // Move left
+  } else if (keysBeingPressed['d']) {
+    moveY -= moveSpeed  // Move right
+  } else if (keysBeingPressed['w']) {
+      moveX += moveSpeed  // Move up
+  } else if (keysBeingPressed['s']) {
+      moveX -= moveSpeed  // Move down
+  } 
+
+
+  let translateMatrix = m4trans(moveX,moveY,moveZ)
+  gl.uniformMatrix4fv(program.uniforms.m, false, translateMatrix)
   gl.uniformMatrix4fv(program.uniforms.v, false, V)
   gl.uniformMatrix4fv(program.uniforms.p, false, p)
   gl.drawElements(octa.mode, octa.count, octa.type, 0)
   
-  // A smaller octahedron (the Earth)
-  // orbiting the Sun once every few seconds
-  // spinning like a top several times a second
-  
-  let eRadius = 2.4  // Distance from Sun
-  let eOrbitPeriod = 1/4 // ops
-  let eSpin = 2 // rps
-  let eSize = .5
-  let earthMatrix = m4mul(
-
-    //last 
-    m4rotX(seconds*eOrbitPeriod * Math.PI),   // orbit
-    m4trans(0, 0, eRadius) ,     // move to orbit  
-    m4rotX(seconds *eSpin* Math.PI),    //  spin  
-    m4scale(eSize,eSize,eSize) // scale
-    //first
-  ) 
-  gl.uniformMatrix4fv(program.uniforms.m, false, earthMatrix)
-  gl.drawElements(octa.mode, octa.count, octa.type, 0)
-
-  // An octahedron (Mars) a little smaller than the Earth
-  // 1.6 times as far from the Sun as the Earth
-  // orbiting the Sun 1.9 times slower than the Earth
-  // spinning like a top 2.2 times slower than the Earth
-  let mRadius = eRadius*1.6  // Distance from Sun
-  let mOrbitPeriod = eOrbitPeriod/1.9
-  let mSpin = eSpin/2.2
-  let mSize = eSize*.9
-  
-  let marsMatrix = m4mul(
-    //last 
-    m4rotX(seconds*mOrbitPeriod * Math.PI),
-    m4trans(0, 0, mRadius) ,
-    m4rotX(seconds *mSpin* Math.PI) ,
-    m4scale(mSize,mSize,mSize)
-    //first
-  ) 
-  gl.uniformMatrix4fv(program.uniforms.m, false, marsMatrix)
-  
-  gl.drawElements(octa.mode, octa.count, octa.type, 0)
-
-  gl.bindVertexArray(tetra.vao)
-
-
-  // A tetrahedron (the Moon) smaller than the Earth
-  // smaller than the Earth
-  // orbiting the Earth faster than the Earth orbits the Sun but slower than the Earth spins
-  // always presenting the same side of itself to the Earth
-  let moonRadius = .75  // Distance from Earth
-  let moonSpinOrbit = 1
-  let moonSize = eSize * .9
-  let moonMatrix = m4mul(
-    //last 
-    m4rotX(seconds*eOrbitPeriod * Math.PI),   // orbit
-    m4trans(0, 0, eRadius) ,     // move to Sun orbit  
-    m4rotX(seconds *moonSpinOrbit* Math.PI),    //  spin  
-    m4trans(0, 0, moonRadius) ,     // move to Earth orbit  
-    m4scale(moonSize,moonSize,moonSize), // scale moon
-    m4scale(eSize,eSize,eSize) // scale to earth
-    //first
-  ) 
-  gl.uniformMatrix4fv(program.uniforms.m, false, moonMatrix)
-  
-  gl.drawElements(tetra.mode, tetra.count, tetra.type, 0)
-
-
-  // A tetrahedron (Phobos) smaller than Mars
-  // orbiting Mars several times faster than Mars spins
-  // always presenting the same side of itself to Mars
-  let phobosRadius = .75  // Distance from Earth
-  let phobosSpinOrbit = 5
-  let phobosSize = mSize * .5
-  let phobosMatrix = m4mul(
-    //last 
-    m4rotX(seconds*mOrbitPeriod * Math.PI),   // orbit
-    m4trans(0, 0, mRadius) ,     // move to Sun orbit  
-    m4rotX(seconds *phobosSpinOrbit* Math.PI),    //  spin  
-    m4trans(0, 0, phobosRadius) ,     // move to Earth orbit  
-    m4scale(phobosSize,phobosSize,phobosSize), // scale moon
-    m4scale(eSize,eSize,eSize) // scale to earth
-    //first
-  ) 
-  gl.uniformMatrix4fv(program.uniforms.m, false, phobosMatrix)
-  
-  gl.drawElements(tetra.mode, tetra.count, tetra.type, 0)
-
-  // A tetrahedron (Deimos) half the size of Phobos
-  // twice as far from Mars as Phobos
-  // orbiting Mars only a little faster than Mars spins
-  // always presenting the same side of itself to Mars
-  
-  let deimosRadius = phobosRadius *2  // Distance from Earth
-  let deimosSpinOrbit = mOrbitPeriod*1.1
-  let deimosSize = phobosSize /2
-  let deimosMatrix = m4mul(
-    //last 
-    m4rotX(seconds*mOrbitPeriod * Math.PI),   // orbit
-    m4trans(0, 0, mRadius) ,     // move to Sun orbit  
-    m4rotX(seconds *deimosSpinOrbit* Math.PI),    //  spin  
-    m4trans(0, 0, deimosRadius) ,     // move to Earth orbit  
-    m4scale(deimosSize,deimosSize,deimosSize), // scale moon
-    m4scale(eSize,eSize,eSize) // scale to earth
-    //first
-  ) 
-  gl.uniformMatrix4fv(program.uniforms.m, false, deimosMatrix)
-  
-  gl.drawElements(tetra.mode, tetra.count, tetra.type, 0)
 }
 
 
@@ -263,16 +171,16 @@ function fillScreen() {
   canvas.style.height = ''
   if (window.gl) {
       gl.viewport(0,0, canvas.width, canvas.height)
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
       window.p = m4perspNegZ(0.1, 25, 1.5, canvas.width, canvas.height)
   }
 }
 
 /** Compile, link, set up tetraetry */
 window.addEventListener('load', async (event) => {
-  window.gl = document.querySelector('canvas').getContext('webgl2')
+  window.gl = document.querySelector('canvas').getContext('webgl2',{preserveDrawingBuffer:true})
   let vs = await fetch('vertex.glsl').then(res => res.text())
   let fs = await fetch('fragment.glsl').then(res => res.text())   
-  let tetrahedron = await fetch('tetrahedron.json').then(res => res.json())
   let octahedron = await fetch('octahedron.json').then(res => res.json())
 
   window.program = compileShader(vs,fs)
@@ -280,8 +188,12 @@ window.addEventListener('load', async (event) => {
   gl.enable(gl.DEPTH_TEST)
   fillScreen()
   window.addEventListener('resize', fillScreen)
-  window.tetra = setuptetraery(tetrahedron)
   window.octa = setuptetraery(octahedron)
   requestAnimationFrame(tick) // asks browser to call tick before first frame
 
 })
+
+window.keysBeingPressed = {}
+window.addEventListener('keydown', event => keysBeingPressed[event.key] = true)
+window.addEventListener('keyup', event => keysBeingPressed[event.key] = false)
+

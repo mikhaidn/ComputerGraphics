@@ -62,71 +62,116 @@ function compileShader(vs_source, fs_source) {
  *  - count = the 2nd argument for gl.drawElements
  *  - type = the 3rd argument for gl.drawElements
  *  - vao = the vertex array object for use with gl.bindVertexArray
+ *  - posbuffer = the buffer for positions of the verticies
+ *  - positions = the position array for the verticies
  */
-function setuptetraery(tetra) {
+function setupGeomery(geom) {
   var triangleArray = gl.createVertexArray()
   gl.bindVertexArray(triangleArray)
 
-  for(let i=0; i<tetra.attributes.length; i+=1) {
-      let data = tetra.attributes[i]
-      supplyDataBuffer(data, i)
+  let posbuffer = []
+  let positions = []
+  for(let i=0; i<geom.attributes.length; i+=1) {
+    let buf = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf)
+    let f32 = new Float32Array(geom.attributes[i].flat())
+    if (i == 0){
+      posbuffer = buf
+      positions = f32
+    }
+    gl.bufferData(gl.ARRAY_BUFFER, f32, gl.DYNAMIC_DRAW)
+    gl.vertexAttribPointer(i, geom.attributes[i][0].length, gl.FLOAT, false, 0, 0)
+    gl.enableVertexAttribArray(i)
   }
-
-  var indices = new Uint16Array(tetra.triangles.flat())
-  var indexBuffer = gl.createBuffer()
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer)
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW)
-
-  return {
+  
+    var indices = new Uint16Array(geom.triangles.flat())
+    var indexBuffer = gl.createBuffer()
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer)
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.DYNAMIC_DRAW)
+    
+    
+    return {
       mode: gl.TRIANGLES,
       count: indices.length,
       type: gl.UNSIGNED_SHORT,
-      vao: triangleArray
+      vao: triangleArray,
+      buffer: posbuffer,
+      positions: positions,
+    }
   }
-}
   
-/**
- * Sends per-vertex data to the GPU and connects it to a VS input
- * 
- * @param data    a 2D array of per-vertex data (e.g. [[x,y,z,w],[x,y,z,w],...])
- * @param loc     the layout location of the vertex shader's `in` attribute
- * @param mode    (optional) gl.STATIC_DRAW, gl.DYNAMIC_DRAW, etc
- * 
- * @returns the ID of the buffer in GPU memory; useful for changing data later
- */
-function supplyDataBuffer(data, loc, mode) {
-  if (mode === undefined) mode = gl.STATIC_DRAW
-  
-  const buf = gl.createBuffer()
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf)
-  const f32 = new Float32Array(data.flat())
-  gl.bufferData(gl.ARRAY_BUFFER, f32, mode)
-  
-  gl.vertexAttribPointer(loc, data[0].length, gl.FLOAT, false, 0, 0)
-  gl.enableVertexAttribArray(loc)
-  
-  return buf;
-}
+
+  /**
+   * 
+   * @param {*} color - a 3 x 1 [0..1] float array
+   * @returns a JSON object with "triangles" and "attributes" associated with the Illini Logo
+   *          to be used as the input for `setupGeometry` 
+   */
+  function makeIlliniGeom(color) {
+    g = {"triangles":
+      [0,1,2
+        ,1,2,3
+        ,4,5,6
+        ,5,6,7
+        ,8,9,10
+        ,9,10,11
+      ]
+      ,"attributes":
+      [ // position
+        [[-.5,-.9]
+        ,[.5,-.9]
+        ,[-.5,-.6]
+        ,[.5,-.6]
+        ,[-.2,-.6] // middle
+        ,[.2,-.6]
+        ,[-.2,.6] // middle
+        ,[.2,.6]
+        ,[-.5,.9]
+        ,[.5,.9]
+        ,[-.5,.6]
+        ,[.5,.6]
+      ]
+      , // color
+      [color
+        ,color
+        ,color
+        ,color
+        ,color
+        ,color
+        ,color
+        ,color
+        ,color
+        ,color
+        ,color
+        ,color
+      ]
+    ]
+  }
+  return g
+}  
 
 /** Draw one frame */
 function draw(seconds) {
   
-  // gl.clearColor(...[1,1,1,1]) // f(...[1,2,3]) means f(1,2,3)
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+  gl.clear(gl.COLOR_BUFFER_BIT) 
   gl.useProgram(program)
+  
 
-  // gl.bindVertexArray(tetra.vao)
-  // gl.bindVertexArray(octa.vao)
+  gl.bindVertexArray(geom.vao)
+  gl.bindBuffer(gl.ARRAY_BUFFER, geom.buffer)
 
-  // let VIEW_CONSTANT =1.5
-  // let goodView = [2*VIEW_CONSTANT,3*VIEW_CONSTANT,2*VIEW_CONSTANT]
-  // let V = m4view(goodView, [0,0,0], [1,0,0])
+  // introduce a wiggle
+  let f32 = new Float32Array(geom.positions.map((x)=> (x +(Math.random()-.5)*.01)))
+  geom.positions = f32
+
+  gl.bufferData(gl.ARRAY_BUFFER, f32, gl.DYNAMIC_DRAW)
+
+
+  
+  gl.drawElements(geom.mode, geom.count, geom.type, 0)
   
   
-  // gl.drawElements(tetra.mode, tetra.count, tetra.type, 0)
 }
-
-
 
 /** Compute any time-varying or animated aspects of the scene */
 function tick(milliseconds) {
@@ -136,44 +181,14 @@ function tick(milliseconds) {
   requestAnimationFrame(tick)
 }
 
-/** Resizes the canvas to completely fill the screen */
-function fillScreen() {
-  let canvas = document.querySelector('canvas')
-  document.body.style.margin = '0'
-  canvas.style.width = '100vw'
-  canvas.style.height = '100vh'
-  canvas.width = canvas.clientWidth
-  canvas.height = canvas.clientHeight
-  canvas.style.width = ''
-  canvas.style.height = ''
-  if (window.gl) {
-      gl.viewport(0,0, canvas.width, canvas.height)
-      // TO DO: compute projection matrix based on the width/height aspect ratio
-      window.p = m4perspNegZ(0.1, 25, 1.5, canvas.width, canvas.height)
-  }
-}
 
-/** Compile, link, set up tetraetry */
+/** Compile, link, set up geometry */
 window.addEventListener('load', async (event) => {
   window.gl = document.querySelector('canvas').getContext('webgl2')
   let vs = await fetch('vertex.glsl').then(res => res.text())
-  let fs = await fetch('fragment.glsl').then(res => res.text())   
-  document.querySelector('#submit').addEventListener('click', event => {
-    const gridsize = Number(document.querySelector('#gridsize').value) || 2
-    const faults = Number(document.querySelector('#faults').value) || 0
-    // TO DO: generate a new gridsize-by-gridsize grid here, then apply faults to it
-    grid = generateGridMesh(gridsize)
-    console.log("got here")
-  })
-
+  let fs = await fetch('fragment.glsl').then(res => res.text())
   window.program = compileShader(vs,fs)
-
-  gl.enable(gl.DEPTH_TEST)
-  fillScreen()
-  window.addEventListener('resize', fillScreen)
+  window.geom = setupGeomery(makeIlliniGeom(IlliniOrange))
   requestAnimationFrame(tick) // asks browser to call tick before first frame
 
 })
-
-
-

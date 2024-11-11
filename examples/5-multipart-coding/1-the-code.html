@@ -147,22 +147,42 @@ function setupGeomery(geom) {
 <!-- All the other code in one big script element. -->
 <script>
 var tetrahedron =
-    {"triangles":
-        [0,1,2
-        ,2,3,0
-        ,1,2,3
-        ,3,0,1
+  g = {"triangles":
+    [0,1,2
+    ,1,2,3
+    ,4,5,6
+    ,5,6,7
+    ,8,9,10
+    ,9,10,11
+    ]
+,"attributes":
+    [ // position
+        [[-.5,-.9,0]
+        ,[.5,-.9,0]
+        ,[-.5,-.6,0]
+        ,[.5,-.6,0]
+        ,[-.2,-.6,0] // middle
+        ,[.2,-.6,0]
+        ,[-.2,.6,0] // middle
+        ,[.2,.6,0]
+        ,[-.5,.9,0]
+        ,[.5,.9,0]
+        ,[-.5,.6,0]
+        ,[.5,.6,0]
         ]
-    ,"attributes":
-        [ // position
-            [[-0.5,-0.5,-0.5]
-            ,[ 0.5, 0.5,-0.5]
-            ,[-0.5, 0.5, 0.5]
-            ,[ 0.5,-0.5, 0.5]
-            ]
-        ]
-    }
-
+    // , // color
+    //     [color
+    //     ,color
+    //     ,color
+    //     ,color
+    //     ,color
+    //     ,color
+    //     ,color
+    //     ,color
+    //     ,color
+    // ]
+    ]
+}
 
 /** Draw one frame */
 function draw() {
