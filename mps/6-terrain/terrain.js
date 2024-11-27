@@ -211,7 +211,7 @@ function generateGridMesh(gridsize, nFaults) {
       maxHeight = Math.max(maxHeight, z);
       minHeight = Math.min(minHeight, z);
       positions.push([x, y, z]);
-      g.attributes[1].push(ILLINI_ORANGE);
+      g.attributes[1].push(ILLINI_ORANGE     );
     }
   }
 
