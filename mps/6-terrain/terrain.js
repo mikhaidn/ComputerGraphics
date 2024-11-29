@@ -119,8 +119,8 @@ function draw(seconds) {
 
   gl.bindVertexArray(geom.vao)
 
-  let VIEW_CONSTANT = .6
-  let goodView = mul([2, 1, 2], VIEW_CONSTANT)
+  let VIEW_CONSTANT = .5
+  let goodView = mul([3, 1, 1.5], VIEW_CONSTANT)
   // let V = m4view(goodView, [0, 0, 0], [0, 1, 0])
   let v = m4view(goodView, [0, 0, 0], [0, 0, 1])
   let rotatingV = m4mul(v, m4rotZ(seconds))
@@ -168,16 +168,12 @@ function pointShouldBeRaised(x, y, n, p) {
   return dot(sub(b, p), n) >= 0 ? true : false
 }
 
-function computeVertexNormal(n, s, e, w) {
-  return;
-}
-
 function generateGridMesh(gridsize, nFaults) {
   const LOW_X = -1;
   const LOW_Y = -1;
   const HIGH_X = 1;
   const HIGH_Y = 1;
-  const MAX_HEIGHT = 2;
+  const MAX_HEIGHT = 1;
 
   g = {
     "triangles": [],
@@ -211,7 +207,7 @@ function generateGridMesh(gridsize, nFaults) {
       maxHeight = Math.max(maxHeight, z);
       minHeight = Math.min(minHeight, z);
       positions.push([x, y, z]);
-      g.attributes[1].push(ILLINI_ORANGE     );
+      g.attributes[1].push(ILLINI_ORANGE);
     }
   }
 
@@ -229,18 +225,15 @@ function generateGridMesh(gridsize, nFaults) {
     for (let i = 0; i < gridsize; i++) {
       const idx = j * gridsize + i;
 
-      // Get indices of neighboring vertices
-      const n = j > 0 ? positions[(j - 1) * gridsize + i] : positions[idx];         // north
-      const s = j < gridsize - 1 ? positions[(j + 1) * gridsize + i] : positions[idx]; // south
-      const w = i > 0 ? positions[j * gridsize + (i - 1)] : positions[idx];         // west
-      const e = i < gridsize - 1 ? positions[j * gridsize + (i + 1)] : positions[idx]; // east
+      // Get vertices with edge tolerance
+      const n = j > 0 ? positions[(j - 1) * gridsize + i] : positions[idx];
+      const s = j < gridsize - 1 ? positions[(j + 1) * gridsize + i] : positions[idx];
+      const w = i > 0 ? positions[j * gridsize + (i - 1)] : positions[idx];
+      const e = i < gridsize - 1 ? positions[j * gridsize + (i + 1)] : positions[idx];
 
       // Compute normal using cross product of grid vectors
-      // res = (n−s)×(w−e)
-      // res / ||res||
-      const crossProduct = cross(sub(n, s), sub(w, e))
-
-      normals.push(div(crossProduct, normalize(crossProduct)));
+      const normal = normalize(cross(sub(n, s), sub(w, e)))
+      normals.push(normal);
     }
   }
 
@@ -298,6 +291,7 @@ window.addEventListener('load', async (event) => {
     grid = generateGridMesh(gridsize, faults)
     window.geom = setupGeomery(grid)
     console.log("got here")
+    console.log(grid)
 
     window.geom = setupGeomery(grid)
     fillScreen()
