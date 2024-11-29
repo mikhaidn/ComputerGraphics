@@ -121,10 +121,16 @@ function draw(seconds) {
 
   let VIEW_CONSTANT = .5
   let goodView = mul([3, 1, 1.5], VIEW_CONSTANT)
-  // let V = m4view(goodView, [0, 0, 0], [0, 1, 0])
+
   let v = m4view(goodView, [0, 0, 0], [0, 0, 1])
   let rotatingV = m4mul(v, m4rotZ(seconds))
 
+  let ld = normalize([0, 0, 1])
+  let h = normalize(add(ld, rotatingV))
+
+  gl.uniform3fv(program.uniforms.lightdir, ld)
+  gl.uniform3fv(program.uniforms.lightcolor, [1, 1, 1])
+  gl.uniform3fv(program.uniforms.halfway, h)
 
   gl.uniformMatrix4fv(program.uniforms.m, false, IDENTITY_MATRIX_4)
   gl.uniformMatrix4fv(program.uniforms.v, false, rotatingV)
@@ -211,13 +217,15 @@ function generateGridMesh(gridsize, nFaults) {
     }
   }
 
+  if (minHeight != maxHeight) {
+    // Normalize heigts
+    positions = positions.map(p => {
+      const normHeight = MAX_HEIGHT * (p[2] - (1 / 2) * (maxHeight + minHeight)) / (maxHeight - minHeight);
+      return [p[0], p[1], normHeight];
+    });
+  }
 
-  // Normalize heigts
-  g.attributes[0] = positions.map(p => {
-    const normHeight = MAX_HEIGHT * (p[2] - (1 / 2) * (maxHeight + minHeight)) / (maxHeight - minHeight);
-    return [p[0], p[1], normHeight];
-  });
-
+  g.attributes[0] = positions
 
   // Generate normals
   let normals = [];
@@ -232,7 +240,11 @@ function generateGridMesh(gridsize, nFaults) {
       const e = i < gridsize - 1 ? positions[j * gridsize + (i + 1)] : positions[idx];
 
       // Compute normal using cross product of grid vectors
-      const normal = normalize(cross(sub(n, s), sub(w, e)))
+      let normal = normalize(cross(sub(n, s), sub(w, e)))
+      // Check if any component is NaN and replace with zero vector if so
+      if (isNaN(normal[0]) || isNaN(normal[1]) || isNaN(normal[2])) {
+        normal = [0, 0, 0];
+      }
       normals.push(normal);
     }
   }
@@ -289,6 +301,7 @@ window.addEventListener('load', async (event) => {
     const gridsize = Number(document.querySelector('#gridsize').value) || 2
     const faults = Number(document.querySelector('#faults').value) || 0
     grid = generateGridMesh(gridsize, faults)
+
     window.geom = setupGeomery(grid)
     console.log("got here")
     console.log(grid)
@@ -305,6 +318,8 @@ window.addEventListener('load', async (event) => {
   window.program = compileShader(vs, fs)
 
   gl.enable(gl.DEPTH_TEST)
+  gl.enable(gl.BLEND)
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
 
 })

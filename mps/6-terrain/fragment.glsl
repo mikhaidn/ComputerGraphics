@@ -4,22 +4,20 @@ uniform vec4 color;
 out vec4 fragColor;
 in vec4 color2;
 in vec4 vnormal;
-uniform vec3 diffuse_tone;
+
+uniform vec3 lightdir;
+uniform vec3 lightcolor;
+uniform vec3 halfway;
+
 void main(){
-    vec3 lightDir=normalize(vec3(1.,1.,1.));
     
-    vec3 normal=vnormal.xyz;
+    vec3 n=normalize(vnormal.xyz);
+    float lambert=max(dot(n,lightdir),0.);
+    float blinn=pow(max(dot(n,halfway),0.),150.);
     
-    // Calculate lambert diffusion
-    float diffuse=max(dot(normal,lightDir),0.);
-    
-    float ambient=.2;
-    
-    // Add spe
-    
-    // Final color combines ambient and diffuse lighting
-    vec3 finalColor=color2.rgb*(ambient+diffuse);
+    vec3 finalColor=color2.rgb*(lightcolor*lambert)+((lightcolor*blinn)*2.);
     
     fragColor=vec4(finalColor,1.);
     // fragColor=vnormal;
+    
 }
