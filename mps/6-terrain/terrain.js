@@ -149,7 +149,7 @@ function tick(milliseconds) {
   requestAnimationFrame(tick)
 }
 
-
+// Generates a list of n random 3D-plane surface normals
 function nRandomNormals(n) {
   normals = []
   for (let i = 0; i < n; i += 1) {
@@ -159,6 +159,7 @@ function nRandomNormals(n) {
   return normals
 }
 
+// Generates a list of n random floating xy-points within a boundary
 function nRandomPoints(n, xmin = -1, ymin = -1, xmax = 1, ymax = 1) {
   points = []
   for (let i = 0; i < n; i += 1) {
@@ -169,11 +170,22 @@ function nRandomPoints(n, xmin = -1, ymin = -1, xmax = 1, ymax = 1) {
   return points
 }
 
+// Returns a boolean depending on which side of a fault line
+// a point lays. 
+// true -> Should be raised
 function pointShouldBeRaised(x, y, n, p) {
   b = [x, y, 0]
   return dot(sub(b, p), n) >= 0 ? true : false
 }
 
+// Returns a procedurally generated grid mesh of gridsize x gridsize points
+// This grid will represent a terrain that has `n` faultlines applied to it to modify
+// its 'bumpyness'
+//
+//  "example_grid_strucutre": {
+//   "triangles": [],
+//   "attributes": [[], [], []]  // position, color, surface normals
+// }
 function generateGridMesh(gridsize, nFaults) {
   const LOW_X = -1;
   const LOW_Y = -1;
