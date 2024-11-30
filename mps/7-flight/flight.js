@@ -112,8 +112,9 @@ function supplyDataBuffer(data, loc, mode) {
 
 
 
-let moveSpeed = .1
-let angleSpeed = .1
+let moveSpeed = .01
+let angleSpeed = .01
+let SPEED_CONSTANT = 5
 
 let oldMove = IDENTITY_MATRIX_4
 
@@ -123,60 +124,74 @@ let moveY = 0
 let moveZ = 0
 let pitch = 0
 let yaw = 0
+let roll = 0
+let movement = [0, 0, 0]
+
+let VIEW_CONSTANT = .5
+let cameraLocation = mul([3, 1, 1.5], VIEW_CONSTANT)
+
+const GLOBAL_UP = [0, 0, 1]
+const CENTER_POSITION = [0, 0, 0]
 /** Draw one frame */
 function draw(seconds) {
 
-  // WASD Controls
-  if (keysBeingPressed['w']) moveX += moveSpeed
-  if (keysBeingPressed['s']) moveX -= moveSpeed
-  if (keysBeingPressed['a']) moveY += moveSpeed
-  if (keysBeingPressed['d']) moveY -= moveSpeed
-
-  // Arrow Key Controls
-  if (keysBeingPressed['ArrowUp']) {
-    pitch += angleSpeed
-  }
-  if (keysBeingPressed['ArrowDown']) {
-    pitch -= angleSpeed
-  }
-  if (keysBeingPressed['ArrowLeft']) {
-    yaw -= moveSpeed
-  }
-  if (keysBeingPressed['ArrowRight']) {
-    yaw += moveSpeed
-  }
-
-  let pitchMatrix = m4rotX(pitch)
-  let yawMatrix = m4rotY(yaw)
-  let cameraAngling = m4mul(pitchMatrix, yawMatrix)
-  let cameraMovement = m4trans(moveX, moveY, moveZ)
-  if (JSON.stringify(oldMove) !== JSON.stringify(cameraMovement)) {
-    console.log(oldMove, cameraMovement)
-  }
-  oldMove = cameraMovement
   // gl.clearColor(...[1,1,1,1]) // f(...[1,2,3]) means f(1,2,3)
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
   gl.useProgram(program)
 
   gl.bindVertexArray(geom.vao)
 
-  let VIEW_CONSTANT = .5
-  let goodView = mul([3, 1, 1.5], VIEW_CONSTANT)
+  let speedup = keysBeingPressed[' '] ? SPEED_CONSTANT : 1;
 
-  let v = m4view(goodView, [0, 0, 0], [0, 0, 1])
+  // Update pitch and yaw
+  if (keysBeingPressed['ArrowUp']) pitch -= angleSpeed * speedup;
+  if (keysBeingPressed['ArrowDown']) pitch += angleSpeed * speedup;
+  if (keysBeingPressed['ArrowLeft']) yaw -= angleSpeed * speedup;
+  if (keysBeingPressed['ArrowRight']) yaw += angleSpeed * speedup;
+  if (keysBeingPressed['q']) roll -= angleSpeed * speedup;
+  if (keysBeingPressed['e']) roll += angleSpeed * speedup;
+  
+  let pitchMatrix = m4rotX(pitch)
+  let yawMatrix = m4rotY(yaw)
+  let cameraAngling = m4mul(m4mul(pitchMatrix, yawMatrix), m4rotZ(roll))
 
-  let ld = normalize([0, 0, 1])
-  let h = normalize(add(ld, v))
+
+
+
+  let v = m4view(cameraLocation, CENTER_POSITION, GLOBAL_UP)
+  let cameraForward = normalize(v)
+  let cameraRight = normalize(cross(cameraForward, GLOBAL_UP))
+
+
+  // WASD Controls
+  if (keysBeingPressed['w']) movement = add(movement, mul(cameraForward, moveSpeed * speedup));
+  if (keysBeingPressed['s']) movement = add(movement, mul(cameraForward, -moveSpeed * speedup));
+  if (keysBeingPressed['a']) movement = add(movement, mul(cameraRight, -moveSpeed * speedup));
+  if (keysBeingPressed['d']) movement = add(movement, mul(cameraRight, moveSpeed * speedup));
+
+
+
+
+  let cameraMovement = m4trans(...movement)
+  let finalCameraView = m4mul(m4mul(cameraAngling, cameraMovement), v)
+
+  let ld = normalize([0, 1, 1])
+  let h = normalize(add(ld, finalCameraView))
+
 
   gl.uniform3fv(program.uniforms.lightdir, ld)
   gl.uniform3fv(program.uniforms.lightcolor, [1, 1, 1])
   gl.uniform3fv(program.uniforms.halfway, h)
 
-  gl.uniformMatrix4fv(program.uniforms.m, false, m4mul(cameraMovement, cameraAngling))
-  gl.uniformMatrix4fv(program.uniforms.v, false, v)
+  gl.uniformMatrix4fv(program.uniforms.m, false, IDENTITY_MATRIX_4)
+  gl.uniformMatrix4fv(program.uniforms.v, false, finalCameraView)
   gl.uniformMatrix4fv(program.uniforms.p, false, p)
-
   gl.drawElements(geom.mode, geom.count, geom.type, 0)
+  if (JSON.stringify(oldMove) !== JSON.stringify(finalCameraView)) {
+    console.log(oldMove, cameraMovement)
+  }
+  oldMove = finalCameraView
+
 }
 
 
@@ -369,93 +384,3 @@ window.addEventListener('load', async (event) => {
 window.keysBeingPressed = {}
 window.addEventListener('keydown', event => keysBeingPressed[event.key] = true)
 window.addEventListener('keyup', event => keysBeingPressed[event.key] = false)
-
-
-// let moveX = 0
-// let moveY = 0
-// let moveZ = 0
-// let moveSpeed = .1
-// let angleSpeed = .1
-
-// let pitch = 0
-// let yaw = 0
-// let omega = .1
-// /** Draw one frame */
-// function draw(seconds) {
-
-//   // gl.clearColor(...[1,1,1,1]) // f(...[1,2,3]) means f(1,2,3)
-//   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-//   gl.useProgram(program)
-
-//   gl.bindVertexArray(geom.vao)
-
-//   let VIEW_CONSTANT = .5
-//   let goodView = mul([3, 1, 1.5], VIEW_CONSTANT)
-
-//   let cameraView = m4view(goodView, [0, 0, 0], [0, 0, 1])
-//   // WASD Controls
-//   if (keysBeingPressed['w']) moveX += moveSpeed
-//   if (keysBeingPressed['s']) moveX -= moveSpeed
-//   if (keysBeingPressed['a']) moveY += moveSpeed
-//   if (keysBeingPressed['d']) moveY -= moveSpeed
-
-//   // Arrow Key Controls
-//   if (keysBeingPressed['ArrowUp']) {
-//     pitch += angleSpeed
-//   }
-//   if (keysBeingPressed['ArrowDown']) {
-//     pitch -= angleSpeed
-//   }
-//   if (keysBeingPressed['ArrowLeft']) {
-//     yaw -= moveSpeed
-//   }
-//   if (keysBeingPressed['ArrowRight']) {
-//     yaw += moveSpeed
-//   }
-//   // Create rotation matrices
-//   let pitchMatrix = m4rotX(pitch)
-//   let yawMatrix = m4rotY(yaw)
-//   let cameraMovement = mul(m4trans(moveX, moveY, moveZ), mul(pitchMatrix, yawMatrix))
-
-//   let ld = normalize([0, 0, 1])
-//   let h = normalize(add(ld, cameraViewx))
-
-//   gl.uniform3fv(program.uniforms.lightdir, ld)
-//   gl.uniform3fv(program.uniforms.lightcolor, [1, 1, 1])
-//   gl.uniform3fv(program.uniforms.halfway, h)
-
-//   gl.uniformMatrix4fv(program.uniforms.m, false, cameraMovement)
-//   gl.uniformMatrix4fv(program.uniforms.v, false, cameraView)
-//   gl.uniformMatrix4fv(program.uniforms.p, false, p)
-
-//   gl.drawElements(geom.mode, geom.count, geom.type, 0)
-// }
-
-
-
-
-// /** Compile, link, set up tetraetry */
-// window.addEventListener('load', async (event) => {
-//   window.gl = document.querySelector('canvas').getContext('webgl2')
-//   let vs = await fetch('vertex.glsl').then(res => res.text())
-//   let fs = await fetch('fragment.glsl').then(res => res.text())
-//   const gridsize = 50
-//   const faults = 50
-//   grid = generateGridMesh(gridsize, faults)
-
-//   window.geom = setupGeomery(grid)
-//   fillScreen()
-//   window.addEventListener('resize', fillScreen)
-
-
-//   window.program = compileShader(vs, fs)
-
-//   gl.enable(gl.DEPTH_TEST)
-//   gl.enable(gl.BLEND)
-//   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
-
-//   requestAnimationFrame(tick)
-
-// })
-
-
