@@ -110,9 +110,50 @@ function supplyDataBuffer(data, loc, mode) {
   return buf;
 }
 
+
+
+let moveSpeed = .1
+let angleSpeed = .1
+
+let oldMove = IDENTITY_MATRIX_4
+
+
+let moveX = 0
+let moveY = 0
+let moveZ = 0
+let pitch = 0
+let yaw = 0
 /** Draw one frame */
 function draw(seconds) {
 
+  // WASD Controls
+  if (keysBeingPressed['w']) moveX += moveSpeed
+  if (keysBeingPressed['s']) moveX -= moveSpeed
+  if (keysBeingPressed['a']) moveY += moveSpeed
+  if (keysBeingPressed['d']) moveY -= moveSpeed
+
+  // Arrow Key Controls
+  if (keysBeingPressed['ArrowUp']) {
+    pitch += angleSpeed
+  }
+  if (keysBeingPressed['ArrowDown']) {
+    pitch -= angleSpeed
+  }
+  if (keysBeingPressed['ArrowLeft']) {
+    yaw -= moveSpeed
+  }
+  if (keysBeingPressed['ArrowRight']) {
+    yaw += moveSpeed
+  }
+
+  let pitchMatrix = m4rotX(pitch)
+  let yawMatrix = m4rotY(yaw)
+  let cameraAngling = m4mul(pitchMatrix, yawMatrix)
+  let cameraMovement = m4trans(moveX, moveY, moveZ)
+  if (JSON.stringify(oldMove) !== JSON.stringify(cameraMovement)) {
+    console.log(oldMove, cameraMovement)
+  }
+  oldMove = cameraMovement
   // gl.clearColor(...[1,1,1,1]) // f(...[1,2,3]) means f(1,2,3)
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
   gl.useProgram(program)
@@ -123,17 +164,16 @@ function draw(seconds) {
   let goodView = mul([3, 1, 1.5], VIEW_CONSTANT)
 
   let v = m4view(goodView, [0, 0, 0], [0, 0, 1])
-  let rotatingV = m4mul(v, m4rotZ(seconds))
 
   let ld = normalize([0, 0, 1])
-  let h = normalize(add(ld, rotatingV))
+  let h = normalize(add(ld, v))
 
   gl.uniform3fv(program.uniforms.lightdir, ld)
   gl.uniform3fv(program.uniforms.lightcolor, [1, 1, 1])
   gl.uniform3fv(program.uniforms.halfway, h)
 
-  gl.uniformMatrix4fv(program.uniforms.m, false, IDENTITY_MATRIX_4)
-  gl.uniformMatrix4fv(program.uniforms.v, false, rotatingV)
+  gl.uniformMatrix4fv(program.uniforms.m, false, m4mul(cameraMovement, cameraAngling))
+  gl.uniformMatrix4fv(program.uniforms.v, false, v)
   gl.uniformMatrix4fv(program.uniforms.p, false, p)
 
   gl.drawElements(geom.mode, geom.count, geom.type, 0)
@@ -306,26 +346,14 @@ window.addEventListener('load', async (event) => {
   window.gl = document.querySelector('canvas').getContext('webgl2')
   let vs = await fetch('vertex.glsl').then(res => res.text())
   let fs = await fetch('fragment.glsl').then(res => res.text())
-  let isFirstCall = true
+  const gridsize = 50
+  const faults = 50
+  grid = generateGridMesh(gridsize, faults)
 
-  document.querySelector('#submit').addEventListener('click', event => {
+  window.geom = setupGeomery(grid)
+  fillScreen()
+  window.addEventListener('resize', fillScreen)
 
-    const gridsize = Number(document.querySelector('#gridsize').value) || 2
-    const faults = Number(document.querySelector('#faults').value) || 0
-    grid = generateGridMesh(gridsize, faults)
-
-    window.geom = setupGeomery(grid)
-    console.log("got here")
-    console.log(grid)
-
-    window.geom = setupGeomery(grid)
-    fillScreen()
-    window.addEventListener('resize', fillScreen)
-    if (isFirstCall) {
-      requestAnimationFrame(tick)
-      isFirstCall = false
-    } // asks browser to call tick before first frame
-  })
 
   window.program = compileShader(vs, fs)
 
@@ -333,8 +361,101 @@ window.addEventListener('load', async (event) => {
   gl.enable(gl.BLEND)
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
+  requestAnimationFrame(tick)
 
 })
 
+
+window.keysBeingPressed = {}
+window.addEventListener('keydown', event => keysBeingPressed[event.key] = true)
+window.addEventListener('keyup', event => keysBeingPressed[event.key] = false)
+
+
+// let moveX = 0
+// let moveY = 0
+// let moveZ = 0
+// let moveSpeed = .1
+// let angleSpeed = .1
+
+// let pitch = 0
+// let yaw = 0
+// let omega = .1
+// /** Draw one frame */
+// function draw(seconds) {
+
+//   // gl.clearColor(...[1,1,1,1]) // f(...[1,2,3]) means f(1,2,3)
+//   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+//   gl.useProgram(program)
+
+//   gl.bindVertexArray(geom.vao)
+
+//   let VIEW_CONSTANT = .5
+//   let goodView = mul([3, 1, 1.5], VIEW_CONSTANT)
+
+//   let cameraView = m4view(goodView, [0, 0, 0], [0, 0, 1])
+//   // WASD Controls
+//   if (keysBeingPressed['w']) moveX += moveSpeed
+//   if (keysBeingPressed['s']) moveX -= moveSpeed
+//   if (keysBeingPressed['a']) moveY += moveSpeed
+//   if (keysBeingPressed['d']) moveY -= moveSpeed
+
+//   // Arrow Key Controls
+//   if (keysBeingPressed['ArrowUp']) {
+//     pitch += angleSpeed
+//   }
+//   if (keysBeingPressed['ArrowDown']) {
+//     pitch -= angleSpeed
+//   }
+//   if (keysBeingPressed['ArrowLeft']) {
+//     yaw -= moveSpeed
+//   }
+//   if (keysBeingPressed['ArrowRight']) {
+//     yaw += moveSpeed
+//   }
+//   // Create rotation matrices
+//   let pitchMatrix = m4rotX(pitch)
+//   let yawMatrix = m4rotY(yaw)
+//   let cameraMovement = mul(m4trans(moveX, moveY, moveZ), mul(pitchMatrix, yawMatrix))
+
+//   let ld = normalize([0, 0, 1])
+//   let h = normalize(add(ld, cameraViewx))
+
+//   gl.uniform3fv(program.uniforms.lightdir, ld)
+//   gl.uniform3fv(program.uniforms.lightcolor, [1, 1, 1])
+//   gl.uniform3fv(program.uniforms.halfway, h)
+
+//   gl.uniformMatrix4fv(program.uniforms.m, false, cameraMovement)
+//   gl.uniformMatrix4fv(program.uniforms.v, false, cameraView)
+//   gl.uniformMatrix4fv(program.uniforms.p, false, p)
+
+//   gl.drawElements(geom.mode, geom.count, geom.type, 0)
+// }
+
+
+
+
+// /** Compile, link, set up tetraetry */
+// window.addEventListener('load', async (event) => {
+//   window.gl = document.querySelector('canvas').getContext('webgl2')
+//   let vs = await fetch('vertex.glsl').then(res => res.text())
+//   let fs = await fetch('fragment.glsl').then(res => res.text())
+//   const gridsize = 50
+//   const faults = 50
+//   grid = generateGridMesh(gridsize, faults)
+
+//   window.geom = setupGeomery(grid)
+//   fillScreen()
+//   window.addEventListener('resize', fillScreen)
+
+
+//   window.program = compileShader(vs, fs)
+
+//   gl.enable(gl.DEPTH_TEST)
+//   gl.enable(gl.BLEND)
+//   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+
+//   requestAnimationFrame(tick)
+
+// })
 
 
