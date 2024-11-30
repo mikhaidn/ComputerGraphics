@@ -125,7 +125,7 @@ function draw(seconds) {
   let v = m4view(goodView, [0, 0, 0], [0, 0, 1])
   let rotatingV = m4mul(v, m4rotZ(seconds))
 
-  let ld = normalize([0, 0, 1])
+  let ld = normalize([0, 1, 1])
   let h = normalize(add(ld, rotatingV))
 
   gl.uniform3fv(program.uniforms.lightdir, ld)
