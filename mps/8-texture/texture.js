@@ -2,6 +2,10 @@ const ILLINI_ORANGE = [1, 0.373, 0.02]
 const DIFFUSE_TONE = [1, .7, .3]
 const SOURCE_TONE = [.9, 1, 1]
 const IDENTITY_MATRIX_4 = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
+
+let isImg = false
+let providedColor = new Float32Array([1, 1, 1, 0.3])
+let providedImg = new Image()
 /**
  * Given the source code of a vertex and fragment shader, compiles them,
  * and returns the linked program.
@@ -129,7 +133,7 @@ function draw(seconds) {
   let h = normalize(add(ld, rotatingV))
 
   gl.uniform3fv(program.uniforms.lightdir, ld)
-  gl.uniform3fv(program.uniforms.lightcolor, [1, 1, 1])
+  gl.uniform4fv(program.uniforms.lightcolor, providedColor)
   gl.uniform3fv(program.uniforms.halfway, h)
 
   gl.uniformMatrix4fv(program.uniforms.m, false, IDENTITY_MATRIX_4)
@@ -184,7 +188,7 @@ function pointShouldBeRaised(x, y, n, p) {
 //
 //  "example_grid_strucutre": {
 //   "triangles": [],
-//   "attributes": [[], [], []]  // position, color, surface normals
+//   "attributes": [[], [], [], []]  // position, color, surface normals, texelcoords
 // }
 function generateGridMesh(gridsize, nFaults) {
   const LOW_X = -1;
@@ -195,7 +199,7 @@ function generateGridMesh(gridsize, nFaults) {
 
   g = {
     "triangles": [],
-    "attributes": [[], [], []]  // position, color, surface normals
+    "attributes": [[], [], [], []]  // position, color, surface normals, texelcoords
   }
 
   if (gridsize < 2 || gridsize > 255) {
@@ -226,6 +230,9 @@ function generateGridMesh(gridsize, nFaults) {
       minHeight = Math.min(minHeight, z);
       positions.push([x, y, z]);
       g.attributes[1].push(ILLINI_ORANGE);
+
+      texCoords = div([i, j], gridsize)
+      g.attributes[3].push(texCoords);
     }
   }
 
@@ -297,12 +304,17 @@ function fillScreen() {
   }
 }
 
-/** Compile, link, set up tetraetry */
+
+
+/** Compile, link, set up grid */
 window.addEventListener('load', async (event) => {
   window.gl = document.querySelector('canvas').getContext('webgl2')
   let vs = await fetch('vertex.glsl').then(res => res.text())
   let fs = await fetch('fragment.glsl').then(res => res.text())
+  let imgVS = await fetch('imgVertex.glsl').then(res => res.text())
+  let imgFS = await fetch('imgFragment.glsl').then(res => res.text())
   let isFirstCall = true
+  isImg = false
 
   document.querySelector('#submit').addEventListener('click', event => {
 
@@ -311,19 +323,92 @@ window.addEventListener('load', async (event) => {
     grid = generateGridMesh(gridsize, faults)
 
     window.geom = setupGeomery(grid)
-    console.log("got here")
-    console.log(grid)
-
-    window.geom = setupGeomery(grid)
     fillScreen()
     window.addEventListener('resize', fillScreen)
     if (isFirstCall) {
       requestAnimationFrame(tick)
       isFirstCall = false
     } // asks browser to call tick before first frame
+    console.log("got here")
+    console.log(providedColor)
   })
 
-  window.program = compileShader(vs, fs)
+
+  // Handle the following cases:
+  // 1. "" - use [1,1,1,.3]
+  // 2. hex"#RRGGBBAA"
+  // 3. load *.png/*.jpg
+  // 4. on error in (3), use [1,0,1,0]
+  document.querySelector('#texture').addEventListener('change', (event) => {
+    isImg = false
+    window.program = nonTextureProgram
+    const texture = String(document.querySelector('#texture').value) || "";
+
+    // Case 1: Blank input - use default color (1,1,1,0.3)
+    if (texture === '') {
+      providedColor = new Float32Array([1, 1, 1, 0.3])
+
+    } else if (/^#[0-9a-f]{8}$/i.test(texture)) {
+      // Extract RGBA values from hex string
+      const r = Number('0x' + texture.substr(1, 2)) / 255;
+      const g = Number('0x' + texture.substr(3, 2)) / 255;
+      const b = Number('0x' + texture.substr(5, 2)) / 255;
+      const a = Number('0x' + texture.substr(7, 2)) / 255;
+      providedColor = [r, g, b, a]
+    } else if (/\.(jpg|png)$/i.test(texture)) {
+      let img = new Image();
+
+      img.crossOrigin = 'anonymous';
+
+      img.addEventListener('error', () => {
+        // Image failed to load - use Red color
+        providedColor = new Float32Array([1, 0, 1, 0.3])
+      });
+
+      img.addEventListener('load', () => {
+        isImg = true
+        // Image loaded successfully
+        window.program = withTextureProgram
+        providedImg = img;
+
+        let slot = 0; // this is the only image (at a time)
+        let texture = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE0 + slot);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+        gl.texImage2D(
+          gl.TEXTURE_2D, // destination slot
+          0, // the mipmap level this data provides; almost always 0
+          gl.RGBA, // how to store it in graphics memory
+          gl.RGBA, // how it is stored in the image object
+          gl.UNSIGNED_BYTE, // size of a single pixel-color in HTML
+          img, // source data
+        );
+        gl.generateMipmap(gl.TEXTURE_2D) // lets you use a mipmapping min filter
+      });
+
+      // trigger image load
+      img.src = texture;
+
+
+    } else {
+
+      // Invalid input - use default color
+      providedColor = new Float32Array([1, 1, 1, 0.3])
+    }
+
+  });
+
+  nonTextureProgram = compileShader(vs, fs)
+
+  withTextureProgram = compileShader(imgVS, imgFS)
+
+
+  window.program = nonTextureProgram
 
   gl.enable(gl.DEPTH_TEST)
   gl.enable(gl.BLEND)
