@@ -148,7 +148,6 @@ function detectCollisions(spheres) {
   for (let i = 0; i < len; i++) {
     for (let j = i + 1; j < len; j++) {
 
-      // Square of distance (avoid square root for performance)
       const distance = mag(sub(spheres[j].position, spheres[i].position));
 
       // If distance is less than diameter, spheres are colliding
@@ -163,23 +162,22 @@ function detectCollisions(spheres) {
 function detectAndHandleCollisionWithWall(sphere, elasticity = 0.9) {
   const radius = DIAMETER / 2
 
-  // Check each dimension (x, y, z)
+
   for (let dim = 0; dim < 3; dim++) {
     // Check lower bound
     if (sphere.position[dim] - radius <= BOX_LOW) {
       console.log("got here")
-      // Reverse velocity in this dimension
+      // Reverse velocity + dampen
       sphere.velocity[dim] = -sphere.velocity[dim] * elasticity
-      // Correct position
       sphere.position[dim] = BOX_LOW + radius
     }
 
     // Check upper bound
     else if (sphere.position[dim] + radius >= BOX_HIGH) {
       console.log("got here:", sphere.position, radius, BOX_HIGH)
-      // Reverse velocity in this dimension
+      // Reverse velocity + dampen
       sphere.velocity[dim] = -sphere.velocity[dim] * elasticity
-      // Correct position
+
       sphere.position[dim] = BOX_HIGH - radius
     }
   }
@@ -190,11 +188,8 @@ function handleCollisionWithSphere(spheres, i, j, elasticity = 0.9) {
   const sphere1 = spheres[i];
   const sphere2 = spheres[j];
 
-  // Calculate collision normal (direction vector between centers)
+  // Calculate normal
   const d = normalize(sub(sphere2.position, sphere1.position));
-
-  // Calculate relative velocity
-  const relativeVelocity = sub(sphere2.velocity, sphere1.velocity);
 
   // Calculate velocity in collision direction for each sphere
   const s1 = dot(sphere1.velocity, d);
@@ -211,7 +206,7 @@ function handleCollisionWithSphere(spheres, i, j, elasticity = 0.9) {
   const w2 = sphere2.mass / (sphere1.mass + sphere2.mass);
 
   // Calculate impulse with elasticity factor
-  // Using formula from image: ±wi(1 + e)s where e is elasticity
+  // Using formula
   const impulse1 = -w1 * (1 + elasticity) * s;
   const impulse2 = w2 * (1 + elasticity) * s;
 
