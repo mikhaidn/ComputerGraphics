@@ -221,6 +221,7 @@ function handleCollisionWithSphere(spheres, i, j, elasticity = 0.9) {
     mul(d, impulse2)
   );
 
+  // TODO: investigate using global spheres instead?
   spheres[i] = sphere1
   spheres[j] = sphere2
   return spheres
