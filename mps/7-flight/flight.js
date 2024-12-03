@@ -128,10 +128,13 @@ let roll = 0
 let movement = [0, 0, 0]
 
 let VIEW_CONSTANT = .5
-let cameraLocation = mul([3, 1, 1.5], VIEW_CONSTANT)
+let cameraLocation = mul([2, 1, 2], VIEW_CONSTANT)
+
+const WORLD_FORWARD = [0, 0, -1]  // -Z is forward in view space
+const WORLD_RIGHT = [1, 0, 0]
 
 const GLOBAL_UP = [0, 0, 1]
-const CENTER_POSITION = [0, 0, 0]
+const CENTER_POSITION = [0, 0, 1]
 /** Draw one frame */
 function draw(seconds) {
 
@@ -150,7 +153,7 @@ function draw(seconds) {
   if (keysBeingPressed['ArrowRight']) yaw += angleSpeed * speedup;
   if (keysBeingPressed['q']) roll -= angleSpeed * speedup;
   if (keysBeingPressed['e']) roll += angleSpeed * speedup;
-  
+
   let pitchMatrix = m4rotX(pitch)
   let yawMatrix = m4rotY(yaw)
   let cameraAngling = m4mul(m4mul(pitchMatrix, yawMatrix), m4rotZ(roll))
@@ -159,15 +162,20 @@ function draw(seconds) {
 
 
   let v = m4view(cameraLocation, CENTER_POSITION, GLOBAL_UP)
-  let cameraForward = normalize(v)
-  let cameraRight = normalize(cross(cameraForward, GLOBAL_UP))
+  let cameraRight = normalize([-v[4], -v[5], -v[6]]) 
+  let cameraForward = normalize([v[0], v[1], v[2]])  
+
 
 
   // WASD Controls
-  if (keysBeingPressed['w']) movement = add(movement, mul(cameraForward, moveSpeed * speedup));
-  if (keysBeingPressed['s']) movement = add(movement, mul(cameraForward, -moveSpeed * speedup));
-  if (keysBeingPressed['a']) movement = add(movement, mul(cameraRight, -moveSpeed * speedup));
-  if (keysBeingPressed['d']) movement = add(movement, mul(cameraRight, moveSpeed * speedup));
+  const newForward = WORLD_FORWARD
+  const newRight = WORLD_RIGHT
+
+
+  if (keysBeingPressed['w']) movement = add(movement, mul(newForward, -moveSpeed * speedup));
+  if (keysBeingPressed['s']) movement = add(movement, mul(newForward, moveSpeed * speedup));
+  if (keysBeingPressed['a']) movement = add(movement, mul(newRight, moveSpeed * speedup));
+  if (keysBeingPressed['d']) movement = add(movement, mul(newRight, -moveSpeed * speedup));
 
 
 
