@@ -1,6 +1,7 @@
 const IDENTITY_MATRIX_4 = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
-const BOX_LOW = -1
-const BOX_HIGH = 1
+const BOX_MAG = 2
+const BOX_LOW = -BOX_MAG
+const BOX_HIGH = BOX_MAG
 const BOX_WIDTH = BOX_HIGH - BOX_LOW
 const SPAWN_RANGE = BOX_WIDTH - .4
 const HALF_SPAWN_RANGE = SPAWN_RANGE / 2
@@ -142,18 +143,14 @@ function detectCollisions(spheres) {
   const len = spheres.length
 
   for (let i = 0; i < len; i++) {
-    spheres[i] = detectAndHandleCollisionWithWall(spheres[i])
+    detectAndHandleCollisionWithWall(spheres[i])
 
   }
   for (let i = 0; i < len; i++) {
     for (let j = i + 1; j < len; j++) {
 
-      const distance = mag(sub(spheres[j].position, spheres[i].position));
+      detectandHandleCollisionWithSphere(spheres[i], spheres[j]);
 
-      // If distance is less than diameter, spheres are colliding
-      if (distance <= DIAMETER) {
-        spheres = handleCollisionWithSphere(spheres, i, j);
-      }
     }
   }
   return spheres
@@ -166,7 +163,6 @@ function detectAndHandleCollisionWithWall(sphere, elasticity = 0.9) {
   for (let dim = 0; dim < 3; dim++) {
     // Check lower bound
     if (sphere.position[dim] - radius <= BOX_LOW) {
-      console.log("got here")
       // Reverse velocity + dampen
       sphere.velocity[dim] = -sphere.velocity[dim] * elasticity
       sphere.position[dim] = BOX_LOW + radius
@@ -174,26 +170,29 @@ function detectAndHandleCollisionWithWall(sphere, elasticity = 0.9) {
 
     // Check upper bound
     else if (sphere.position[dim] + radius >= BOX_HIGH) {
-      console.log("got here:", sphere.position, radius, BOX_HIGH)
       // Reverse velocity + dampen
       sphere.velocity[dim] = -sphere.velocity[dim] * elasticity
 
       sphere.position[dim] = BOX_HIGH - radius
     }
   }
-  return sphere
+  return
 }
 
-function handleCollisionWithSphere(spheres, i, j, elasticity = 0.9) {
-  const sphere1 = spheres[i];
-  const sphere2 = spheres[j];
+function detectandHandleCollisionWithSphere(sphere1, sphere2, elasticity = 0.9) {
+  const distance = mag(sub(sphere1.position, sphere2.position));
+
+  // If distance is less than diameter, spheres are colliding
+  if (distance >= 1) {
+    return
+  }
 
   // Calculate normal
-  const d = normalize(sub(sphere2.position, sphere1.position));
+  const collision_normal = normalize(sub(sphere2.position, sphere1.position));
 
   // Calculate velocity in collision direction for each sphere
-  const s1 = dot(sphere1.velocity, d);
-  const s2 = dot(sphere2.velocity, d);
+  const s1 = dot(sphere1.velocity, collision_normal);
+  const s2 = dot(sphere2.velocity, collision_normal);
 
   // Calculate collision speed
   const s = s1 - s2;
@@ -207,25 +206,23 @@ function handleCollisionWithSphere(spheres, i, j, elasticity = 0.9) {
 
   // Calculate impulse with elasticity factor
   // Using formula
+  console.log(w1, elasticity, s)
   const impulse1 = -w1 * (1 + elasticity) * s;
   const impulse2 = w2 * (1 + elasticity) * s;
 
+  console.log(collision_normal, impulse1)
   // Apply impulses in collision direction
   sphere1.velocity = add(
     sphere1.velocity,
-    mul(d, impulse1)
+    mul(collision_normal, impulse1)
   );
 
   sphere2.velocity = add(
     sphere2.velocity,
-    mul(d, impulse2)
+    mul(collision_normal, impulse2)
   );
-
-  // TODO: investigate using global spheres instead?
-  spheres[i] = sphere1
-  spheres[j] = sphere2
-  return spheres
 }
+
 
 /** Draw one frame */
 function draw(seconds) {

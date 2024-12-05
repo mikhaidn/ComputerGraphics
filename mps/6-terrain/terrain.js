@@ -123,7 +123,7 @@ function draw(seconds) {
   let goodView = mul([3, 1, 1.5], VIEW_CONSTANT)
 
   let v = m4view(goodView, [0, 0, 0], [0, 0, 1])
-  let rotatingV = m4mul(v, m4rotZ(seconds))
+  let rotatingV = m4mul(v, m4rotZ(-seconds/2))
 
   let ld = normalize([0, 1, 1])
   let h = normalize(add(ld, rotatingV))
