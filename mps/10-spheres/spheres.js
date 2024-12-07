@@ -1,11 +1,11 @@
 const IDENTITY_MATRIX_4 = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
 const BOX_MAG = 2
-const BOX_LOW = -BOX_MAG
-const BOX_HIGH = BOX_MAG
+const BOX_LOW = -BOX_MAG / 2
+const BOX_HIGH = BOX_MAG / 2
 const BOX_WIDTH = BOX_HIGH - BOX_LOW
 const SPAWN_RANGE = BOX_WIDTH - .4
 const HALF_SPAWN_RANGE = SPAWN_RANGE / 2
-const DIAMETER = .15
+const RADIUS = .15
 
 let tic = 0
 /**
@@ -149,7 +149,7 @@ function detectCollisions(spheres) {
   for (let i = 0; i < len; i++) {
     for (let j = i + 1; j < len; j++) {
 
-      detectandHandleCollisionWithSphere(spheres[i], spheres[j]);
+      detectandHandleCollisionWithSphere(spheres[i], spheres[j], .9);
 
     }
   }
@@ -157,23 +157,20 @@ function detectCollisions(spheres) {
 }
 
 function detectAndHandleCollisionWithWall(sphere, elasticity = 0.9) {
-  const radius = DIAMETER / 2
-
-
   for (let dim = 0; dim < 3; dim++) {
     // Check lower bound
-    if (sphere.position[dim] - radius <= BOX_LOW) {
+    if (sphere.position[dim] - RADIUS <= BOX_LOW) {
       // Reverse velocity + dampen
-      sphere.velocity[dim] = -sphere.velocity[dim] * elasticity
-      sphere.position[dim] = BOX_LOW + radius
+      sphere.velocity[dim] *= -elasticity
+      sphere.position[dim] = BOX_LOW + RADIUS
     }
 
     // Check upper bound
-    else if (sphere.position[dim] + radius >= BOX_HIGH) {
+    else if (sphere.position[dim] + RADIUS >= BOX_HIGH) {
       // Reverse velocity + dampen
-      sphere.velocity[dim] = -sphere.velocity[dim] * elasticity
+      sphere.velocity[dim] *= -elasticity
 
-      sphere.position[dim] = BOX_HIGH - radius
+      sphere.position[dim] = BOX_HIGH - RADIUS
     }
   }
   return
@@ -182,35 +179,34 @@ function detectAndHandleCollisionWithWall(sphere, elasticity = 0.9) {
 function detectandHandleCollisionWithSphere(sphere1, sphere2, elasticity = 0.9) {
   const distance = mag(sub(sphere1.position, sphere2.position));
 
+  const minDistance = RADIUS * 2;
+
+
   // If distance is less than diameter, spheres are colliding
-  if (distance >= 1) {
+  if (distance > minDistance) {
     return
   }
 
-  // Calculate normal
   const collision_normal = normalize(sub(sphere2.position, sphere1.position));
 
-  // Calculate velocity in collision direction for each sphere
+  // Calculate speed in collision direction for each sphere
   const s1 = dot(sphere1.velocity, collision_normal);
   const s2 = dot(sphere2.velocity, collision_normal);
 
-  // Calculate collision speed
+  // Calculate net collision speed
   const s = s1 - s2;
 
   // Only resolve if objects are moving toward each other
-  if (s > 0) return;
+  if (s < 0) return;
 
-  // Calculate mass weights (contribution of each particle to collision)
+  // Calculate mass weights - at the moment, should always be 1/2 
   const w1 = sphere1.mass / (sphere1.mass + sphere2.mass);
   const w2 = sphere2.mass / (sphere1.mass + sphere2.mass);
 
   // Calculate impulse with elasticity factor
-  // Using formula
-  console.log(w1, elasticity, s)
   const impulse1 = -w1 * (1 + elasticity) * s;
   const impulse2 = w2 * (1 + elasticity) * s;
 
-  console.log(collision_normal, impulse1)
   // Apply impulses in collision direction
   sphere1.velocity = add(
     sphere1.velocity,
@@ -220,6 +216,20 @@ function detectandHandleCollisionWithSphere(sphere1, sphere2, elasticity = 0.9) 
   sphere2.velocity = add(
     sphere2.velocity,
     mul(collision_normal, impulse2)
+  );
+
+
+  // Update positions as well to avoid clumping
+  const overlap = minDistance - distance;
+
+  sphere1.position = sub(
+    sphere1.position,
+    mul(collision_normal, overlap / 2)
+  );
+
+  sphere2.position = add(
+    sphere2.position,
+    mul(collision_normal, overlap / 2)
   );
 }
 
@@ -236,7 +246,7 @@ function draw(seconds) {
 
   gl.bindVertexArray(geom.vao)
 
-  let VIEW_CONSTANT = .5
+  let VIEW_CONSTANT = 1
   let goodView = mul([3, 1, 1.5], VIEW_CONSTANT)
 
   let camera = m4view(goodView, [0, 0, 0], [0, 0, 1])
@@ -249,8 +259,8 @@ function draw(seconds) {
   gl.uniform3fv(program.uniforms.halfway, h)
 
   let spheresToRender = window.spheres
-  spheresToRender = performDynamics(spheresToRender, dt)
   spheresToRender = detectCollisions(spheresToRender)
+  spheresToRender = performDynamics(spheresToRender, dt)
 
   spheresToRender.forEach(sphere => {
     /**
@@ -265,7 +275,7 @@ function draw(seconds) {
      * }
      */
 
-    let sphereModel = m4mul(m4scale(DIAMETER, DIAMETER, DIAMETER), m4trans(...sphere.position))
+    let sphereModel = m4mul(m4trans(...sphere.position), m4scale(RADIUS, RADIUS, RADIUS))
 
     gl.uniform3fv(program.uniforms.ballcolor, sphere.color)
     gl.uniformMatrix4fv(program.uniforms.m, false, sphereModel)
@@ -276,10 +286,18 @@ function draw(seconds) {
 }
 
 
+
+const RESET_TIME = 15
+let counter = 0
 /** Compute any time-varying or animated aspects of the scene */
 function tick(milliseconds) {
   let seconds = milliseconds / 1000.0;
+  let resetSeconds = milliseconds / 1000.0 - counter * RESET_TIME;
 
+  if (resetSeconds > RESET_TIME) {
+    window.spheres = generateSpheres(window.nspheres, window.gravity)
+    counter += 1
+  }
   draw(seconds)
   requestAnimationFrame(tick)
 }
@@ -349,7 +367,7 @@ function generateSpheres(nSpheres, gravity) {
     })
 
   }
-  console.log(spheres.map(x => x.position))
+
   return spheres
 }
 
@@ -362,8 +380,8 @@ window.addEventListener('load', async (event) => {
   let sphere = await fetch('sphere.json').then(res => res.json())
   addNormals(sphere)
 
-  window.nspheres = 3;
-  window.gravity = 9.80665;
+  window.nspheres = 50;
+  window.gravity = 2;
 
 
   document.querySelector('#submit').addEventListener('click', event => {
