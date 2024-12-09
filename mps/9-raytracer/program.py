@@ -1,12 +1,18 @@
 from PIL import Image
 import sys
 import numpy as np
-from typing import List
+from typing import Protocol, List
 
 
-class Geometry:
-    def intersection(self, origin, direction):
-        raise NotImplementedError()
+class HitInfo(Protocol):
+    didHit: bool
+    hitDistance: float
+    hitNormal: List[float]
+    hitPoint: List[float]
+
+
+class Geometry(Protocol):
+    def calculate_intersection(self, origin: List, direction: List) -> HitInfo: ...
 
 
 class Sphere(Geometry):
@@ -42,6 +48,7 @@ class Sun(Geometry):
 
 
 class Renderer:
+    geometries: List[Geometry]
 
     def __init__(self):
         self.sRGB = True
@@ -84,14 +91,41 @@ class Renderer:
 
         return states
 
+    def RenderFrame(self):
+        for i in range(self.width):
+            for j in range(self.height):
+                cameraPosition = [i, j, 0]
+                cameraAngle = [0, 0, -1]
+                incomingLight = self.Trace(cameraPosition, cameraAngle)
+
+                print("got here", i, j, incomingLight)
+                self.image.putpixel((i, j), incomingLight)
+
+    def Trace(self, cameraPosition, cameraAngle):
+        ray = {"position": cameraPosition, "angle": cameraAngle}
+        hitInfo = self.CalculateRayCollision(ray)
+
+        # if hit - update image w/ material stuff
+        # else return background color, using cyan for now
+        # bg_color = tuple(np.asarray([0, 1, 1, 1] * 256).astype(int))
+        # print(bg_color)
+        return (0, 255, 255, 255)
+
+    def CalculateRayCollision(self, ray):
+        if ray["position"] == [0, 0, 0]:
+            collisions = [
+                g.calculate_intersection(ray["position"], ray["angle"])
+                for g in self.geometries
+            ]
+        return
+
     def save(self):
-        [g.calculate_intersection(None, None) for g in self.geometries]
         print(self.image, self.height, self.width, self.output_file)
 
         if self.sRGB:
             srgb_image = convert_linear_to_srgb(self.image)
             self.image = srgb_image
-        # self.image.save(self.output_file)
+        self.image.save(self.output_file)
 
 
 def print_points(text, points):
@@ -135,6 +169,7 @@ def parse_file(filename):
                 xyz = np.array(rem).astype(float)
                 renderer = renderer.AddSun(xyz)
 
+        renderer.RenderFrame()
         renderer.save()
 
 
