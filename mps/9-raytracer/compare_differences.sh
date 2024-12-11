@@ -6,13 +6,13 @@ temp_files=()
 # Loop through all PNG files in the current directory
 for file in *.png; do
     # Check if the file exists in the reference directory
-    if [ -f "reference/$file" ]; then
+    if [ -f "reference/ray-$file" ]; then
         # Create a temporary file for the difference
         temp_diff=$(mktemp)
         temp_files+=("$temp_diff")
         
         # Compare the current file with its reference counterpart
-        compare -fuzz 3% -metric AE "$file" "reference/$file" "$temp_diff" 2>/dev/null
+        compare -fuzz 3% -metric AE "$file" "reference/ray-$file" "$temp_diff" 2>/dev/null
         
         echo "Processed $file"
     else

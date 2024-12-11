@@ -1,7 +1,7 @@
 from PIL import Image
 import sys
 import numpy as np
-from typing import Protocol, List
+from typing import Any, Protocol, List
 
 
 class HitInfo(Protocol):
@@ -18,33 +18,89 @@ class Geometry(Protocol):
 class Sphere(Geometry):
     def __init__(self, r, pos, state):
         self.r = r
-        self.position = pos
+        self.position = np.array(pos)
         self.state = state
 
     def calculate_intersection(self, origin, direction):
-        print(
-            "i'm raytracing to Sphere!",
-            origin,
-            direction,
-            self.position,
-            self.r,
-            self.state,
+        # For clarity, let's map variables to the algorithm notation
+        r_o = origin  # ray origin
+        r_d = direction  # ray direction
+        c = self.position  # sphere center
+        r = self.r  # sphere radius
+
+        # 1. Check if origin is inside sphere
+        c_minus_ro = c - r_o
+        inside = np.dot(c_minus_ro, c_minus_ro) < r * r
+
+        # 2. Calculate t_c = (c - r_o)·r_d / ∥r_d∥
+        t_c = np.dot(c_minus_ro, r_d) / np.dot(r_d, r_d)
+
+        # 3. Early exit check
+        if not inside and t_c < 0:
+            return None
+
+        # 4. Calculate d² = ∥r_o + t_c·r_d - c∥²
+        closest_point = r_o + t_c * r_d - c
+        d_squared = np.dot(closest_point, closest_point)
+
+        # 5. Early exit check
+        if not inside and r * r < d_squared:
+            return None
+
+        # 6. Calculate t_offset = √(r² - d²) / ∥r_d∥
+        t_offset = np.sqrt(r * r - d_squared) / np.sqrt(np.dot(r_d, r_d))
+
+        # 7. Calculate intersection point and distance
+        if inside:
+            t = t_c + t_offset
+        else:
+            t = t_c - t_offset
+
+        intersection = r_o + t * r_d
+        normal = (intersection - self.position) / np.linalg.norm(
+            intersection - self.position
         )
 
+        # Return dictionary with intersection information
+        return {
+            "distance": t,
+            "intersection": intersection,
+            "normal": normal,
+            "sphere": self,
+        }
 
-class Sun(Geometry):
+
+class LightSource(Protocol):
+    def calculate_illumination(self, hitInfo) -> Any: ...
+
+
+class Sun(LightSource):
     def __init__(self, pos, state):
         self.position = pos
         self.state = state
 
-    def calculate_intersection(self, origin, direction):
-        print(
-            "i'm raytracing to Sun!",
-            origin,
-            direction,
-            self.position,
-            self.state,
-        )
+    def calculate_illumination(self, hitInfo):
+        # Get direction from intersection to light
+        light_direction = self.position - hitInfo["intersection"]
+        light_direction = light_direction / np.linalg.norm(light_direction)
+
+        # Get normal, checking if we need to invert it (for two-sided objects)
+        normal = hitInfo["normal"]
+        incident_dot = np.dot(normal, light_direction)
+
+        # If normal points away from ray, invert it
+        if incident_dot < 0:
+            normal = -normal
+            incident_dot = -incident_dot
+
+        # If surface is facing away from light, no illumination
+        if incident_dot < 0:
+            return np.zeros(3)
+
+        # Calculate illumination using Lambert's law
+        # illumination = object_color * light_color * (normal · light_direction)
+
+        return hitInfo["sphere"].state["color"] * self.state["color"] * incident_dot
 
 
 class Renderer:
@@ -52,8 +108,9 @@ class Renderer:
 
     def __init__(self):
         self.sRGB = True
-        self.color = [0, 0, 0]
+        self.color = np.array([1, 1, 1])
         self.geometries: List[Geometry] = []
+        self.lightSources: List[LightSource] = []
 
     def WithWidth(self, width):
         self.width = width
@@ -78,11 +135,11 @@ class Renderer:
 
     def AddSun(self, position):
         sun = Sun(position, self.GetStates())
-        self.geometries.append(sun)
+        self.lightSources.append(sun)
         return self
 
     def SetColor(self, rgb):
-        self.color = rgb
+        self.color = np.array(rgb)
         return self
 
     def GetStates(self):
@@ -92,32 +149,82 @@ class Renderer:
         return states
 
     def RenderFrame(self):
+        maxWidthOrHeight = max(self.width, self.height)
         for i in range(self.width):
             for j in range(self.height):
-                cameraPosition = [i, j, 0]
-                cameraAngle = [0, 0, -1]
-                incomingLight = self.Trace(cameraPosition, cameraAngle)
+                eye, ray_direction = self.EmitRayFromIndex(maxWidthOrHeight, i, j)
 
-                print("got here", i, j, incomingLight)
+                incomingLight = self.Trace(eye, ray_direction)
+
                 self.image.putpixel((i, j), incomingLight)
 
-    def Trace(self, cameraPosition, cameraAngle):
-        ray = {"position": cameraPosition, "angle": cameraAngle}
+    def EmitRayFromIndex(self, maxWidthOrHeight, i, j):
+        eye = [0, 0, 0]
+        f = [0, 0, -1]
+        r = [1, 0, 0]
+        u = [0, 1, 0]
+        s = [
+            (2 * i - self.width) / maxWidthOrHeight,
+            (self.height - 2 * j) / maxWidthOrHeight,
+            0,
+        ]
+
+        s_x = s[0]  # 2*i - self.width/maxWidthOrHeight
+        s_y = s[1]  # self.height - 2*j
+
+        # Sum all terms
+        ray_direction = np.add(np.add(f, np.multiply(s_x, r)), np.multiply(s_y, u))
+
+        # This is equivalent to:
+        ray_direction = [s_x, s_y, -1]
+        # print(eye, ray_direction)
+        return eye, ray_direction
+
+    def Trace(self, position, direction):
+        ray = {"position": np.array(position), "direction": np.array(direction)}
         hitInfo = self.CalculateRayCollision(ray)
+
+        if hitInfo:
+            return self.CalculateLight(hitInfo)
 
         # if hit - update image w/ material stuff
         # else return background color, using cyan for now
         # bg_color = tuple(np.asarray([0, 1, 1, 1] * 256).astype(int))
         # print(bg_color)
-        return (0, 255, 255, 255)
+        return (0, 0, 0, 0)
+
+    def CalculateLight(self, hitInfo):
+        if hitInfo is None:
+            return np.zeros(3)
+
+        # Calculate illumination from all light sources and sum them
+        total_illumination = np.zeros(3)
+        for light in self.lightSources:
+            illumination = light.calculate_illumination(hitInfo)
+            total_illumination += illumination
+
+        return (
+            int(total_illumination[0] * 255),
+            int(total_illumination[1] * 255),
+            int(total_illumination[2] * 255),
+            255,
+        )
 
     def CalculateRayCollision(self, ray):
-        if ray["position"] == [0, 0, 0]:
-            collisions = [
-                g.calculate_intersection(ray["position"], ray["angle"])
-                for g in self.geometries
-            ]
-        return
+        collisions = [
+            g.calculate_intersection(ray["position"], ray["direction"])
+            for g in self.geometries
+        ]
+        valid_collisions = [
+            c for c in collisions if c is not None and c["distance"] > 0
+        ]
+        if valid_collisions:
+            collision = min(valid_collisions, key=lambda x: x["distance"])
+
+        else:
+            collision = None
+
+        return collision
 
     def save(self):
         print(self.image, self.height, self.width, self.output_file)
