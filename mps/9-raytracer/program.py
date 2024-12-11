@@ -88,10 +88,10 @@ class Sun(LightSource):
         normal = hitInfo["normal"]
         incident_dot = np.dot(normal, light_direction)
 
-        # If normal points away from ray, invert it
-        if incident_dot < 0:
-            normal = -normal
-            incident_dot = -incident_dot
+        # # If normal points away from ray, invert it
+        # if incident_dot < 0:
+        #     normal = -normal
+        #     incident_dot = -incident_dot
 
         # If surface is facing away from light, no illumination
         if incident_dot < 0:
@@ -100,6 +100,8 @@ class Sun(LightSource):
         # Calculate illumination using Lambert's law
         # illumination = object_color * light_color * (normal · light_direction)
 
+        print(hitInfo["sphere"].state["color"])
+        print(self.state["color"])
         return hitInfo["sphere"].state["color"] * self.state["color"] * incident_dot
 
 
@@ -361,9 +363,10 @@ def dda(a, b, dim_index):
 
 
 def linear_to_srgb(linear):
-    return np.where(
+    unclamped = np.where(
         linear < 0.0031308, linear * 12.92, 1.055 * (linear ** (1 / 2.4)) - 0.055
     )
+    return np.clip(unclamped, 0.0, 1.0)
 
 
 def convert_linear_to_srgb(img):
