@@ -14,6 +14,7 @@ class Renderer:
         self.color = np.array([1, 1, 1])
         self.geometries: List[Geometry] = []
         self.lightSources: List[LightSource] = []
+        self.debug = False
 
     def WithWidth(self, width):
         self.width = width
@@ -61,26 +62,30 @@ class Renderer:
 
                 self.image.putpixel((i, j), incomingLight)
 
-    def EmitRayFromIndex(self, maxWidthOrHeight, i, j):
-        eye = [0, 0, 0]
-        f = [0, 0, -1]
-        r = [1, 0, 0]
-        u = [0, 1, 0]
-        s = [
+    def EmitRayFromIndex(self, maxWidthOrHeight:float, i:float, j:float):
+        eye = np.array([0, 0, 0])
+        f = np.array([0, 0, -1])
+        r = np.array([1, 0, 0])
+        u = np.array([0, 1, 0])
+        s = np.array([
             (2 * i - self.width) / maxWidthOrHeight,
             (self.height - 2 * j) / maxWidthOrHeight,
             0,
-        ]
+        ])
 
         s_x = s[0]  # 2*i - self.width/maxWidthOrHeight
         s_y = s[1]  # self.height - 2*j
 
-        # Sum all terms
-        ray_direction = np.add(np.add(f, np.multiply(s_x, r)), np.multiply(s_y, u))
+        # Sum all terms and normaize
+        ray_direction = f + s_x * r + s_y * u
+        ray_direction /= np.linalg.norm(ray_direction)
 
-        # This is equivalent to:
-        ray_direction = [s_x, s_y, -1]
-        # print(eye, ray_direction)
+        # self.debug = False
+        # if i == 55 and j == 45:
+        #     self.debug = True
+        #     print(ray_direction)
+        #     print([s_x, s_y, -1])
+            
         return eye, ray_direction
 
     def Trace(self, position, direction):
@@ -89,6 +94,10 @@ class Renderer:
         ray.direction = np.array(direction)
         
         hitInfo = self.CalculateRayCollision(ray)
+
+        if self.debug:
+            print(ray)
+            print(hitInfo)
 
         if hitInfo:
             return self.CalculateLight(hitInfo)
@@ -106,7 +115,7 @@ class Renderer:
         # Calculate illumination from all light sources and sum them
         total_illumination = np.zeros(3)
         for light in self.lightSources:
-            illumination = light.calculate_illumination(hitInfo)
+            illumination = light.calculate_illumination(hitInfo, self.debug)
             total_illumination += illumination
 
         return (
@@ -128,7 +137,22 @@ class Renderer:
             collision = min(valid_hits, key=lambda x: x.distance)
 
         else:
-            collision = None
+            return None
+
+        shadow_origin = collision.point + collision.normal * 0.0000001
+
+        # Check all lights for shadows
+        collision.in_shadow = {}  # Dictionary to track shadow state per light
+        for light in self.lightSources:
+            to_light = light.get_direction_from_point(shadow_origin)
+            shadow_ray = Ray()
+            shadow_ray.origin = shadow_origin
+            shadow_ray.direction = to_light
+            
+            # Check if anything blocks path to light
+            shadow_hits = [g.calculate_intersection(shadow_ray) for g in self.geometries]
+            collision.in_shadow[light] = any(hit is not None for hit in shadow_hits)
+
 
         return collision
 

@@ -1,10 +1,12 @@
 import numpy as np
+from numpy.typing import NDArray
 from ..structures import LightSource, HitInfo
 
 
 class Sun(LightSource):
     def __init__(self, pos, state):
         self.position = pos
+        self.direction = self.position / np.linalg.norm(self.position)
         self._state = state
 
     @property
@@ -15,27 +17,31 @@ class Sun(LightSource):
     def state(self, value: dict):
         self._state = value
 
-    def calculate_illumination(self, hitInfo:HitInfo):
-        # Get direction from intersection to light
-        light_direction = self.position - hitInfo.point
-        light_direction = light_direction / np.linalg.norm(light_direction)
+    def calculate_illumination(self, hitInfo:HitInfo, debug:bool=False):
+        if hitInfo.in_shadow.get(self, False):  # If this light source is blocked
+            return np.zeros(3)
 
-        # Get normal, checking if we need to invert it (for two-sided objects)
+
+        # the sun is infinitely far away, the point doesn't matter
+        light_direction = self.get_direction_from_point(hitInfo.point)
+
         normal = hitInfo.normal
         incident_dot = np.dot(normal, light_direction)
 
-        # # If normal points away from ray, invert it
-        # if incident_dot < 0:
-        #     normal = -normal
-        #     incident_dot = -incident_dot
+        if debug:
+            print(normal,light_direction,incident_dot)
 
         # If surface is facing away from light, no illumination
         if incident_dot < 0:
             return np.zeros(3)
+        
+        # Make objects two-sided
+        if incident_dot < 0:
+            normal = -normal
+            incident_dot = -incident_dot
 
-        # Calculate illumination using Lambert's law
-        # illumination = object_color * light_color * (normal · light_direction)
 
-        print(hitInfo.material.state["color"])
-        print(self.state["color"])
         return hitInfo.material.state["color"] * self.state["color"] * incident_dot
+
+    def get_direction_from_point (self,_: NDArray[np.float64] ): 
+        return self.direction

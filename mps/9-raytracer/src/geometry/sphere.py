@@ -60,8 +60,9 @@ class Sphere(Geometry):
         normal = (intersection - self.position) / np.linalg.norm(
             intersection - self.position
         )
+        if np.dot(normal,ray.direction)>0:
+            normal= -normal
 
-        # Return dictionary with intersection information
 
         hit = HitInfo()
         hit.distance = t

@@ -7,11 +7,20 @@ class Ray:
     origin: NDArray[np.float64]
     direction: NDArray[np.float64]
 
+
+    def __str__(self):
+        return f"Ray: \n    origin={self.origin}\n    direction={self.direction}"
+
 class HitInfo:
     distance: float
     normal: List[float]
     point: List[float]
-    material: "Geometry"      
+    material: "Geometry"    
+    in_shadow: dict
+
+    def __str__(self):
+        return f"Hit:\n    dist={self.distance:.3f}\n    normal={self.normal}\n    point={self.point}"
+
 
 class Geometry(Protocol):
     def calculate_intersection(self, ray:Ray) -> HitInfo: ...
@@ -21,7 +30,10 @@ class Geometry(Protocol):
 
 
 class LightSource(Protocol):
-    def calculate_illumination(self, hitInfo:HitInfo) -> List[float]: ...
+    def calculate_illumination(self, hitInfo:HitInfo) -> NDArray[np.float64]: ...
+
+    def get_direction_from_point(self,point:NDArray[np.float64]) -> NDArray[np.float64]: ...
 
     @property 
     def state(self) -> dict: ...
+
