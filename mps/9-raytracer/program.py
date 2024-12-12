@@ -28,15 +28,41 @@ def parse_file(filename):
             elif keyword == "color":
                 c = np.array(rem).astype(float)
                 renderer = renderer.SetColor(c)
+
             elif keyword == "sphere":
                 r, xyz = float(rem[-1]), np.array(rem[0:-1]).astype(float)
                 renderer = renderer.AddSphere(r, xyz)
-            elif keyword == "sun":
 
+            elif keyword == "sun":
                 xyz = np.array(rem).astype(float)
                 renderer = renderer.AddSun(xyz)
 
+            elif keyword == "expose":
+                renderer = renderer.WithExposure(float(rem[0]))
+
+            elif keyword == "up":
+                xyz = np.array(rem).astype(float)
+                renderer = renderer.SetUp(xyz)
+
+            elif keyword == "eye":
+                xyz = np.array(rem).astype(float)
+                renderer = renderer.SetEye(xyz)
+
+            elif keyword == "forward":
+                xyz = np.array(rem).astype(float)
+                renderer = renderer.SetForward(xyz)
+
+            elif keyword == "fisheye":
+                renderer = renderer.SetFisheye()
+
+            elif keyword == "panorama":
+                renderer = renderer.SetPanorama()
+
+
+
+
         renderer.RenderFrame()
+        renderer.PostProcess()
         renderer.save()
 
 
