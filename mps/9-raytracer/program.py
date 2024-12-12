@@ -3,6 +3,7 @@ import sys
 import numpy as np
 from src.renderer import Renderer
 
+
 def parse_file(filename):
     image = None
     output_file = ""
@@ -58,8 +59,54 @@ def parse_file(filename):
             elif keyword == "panorama":
                 renderer = renderer.SetPanorama()
 
+            elif keyword == "plane":
+                abcd = np.array(rem).astype(float)
+                renderer = renderer.AddPlane(abcd)
 
+            elif keyword == "xyz":
+                xyz = np.array(rem).astype(float)
+                renderer = renderer.AddVertex(xyz)
 
+            elif keyword == "tri":
+                idx = np.array(rem).astype(int)
+
+                renderer = renderer.AddTriangle(idx)
+
+            elif keyword == "texture":
+                renderer = renderer.SetTexture(rem[0])
+
+            elif keyword == "texcoord":
+                uv = np.array(rem).astype(float)
+                renderer = renderer.SetTexcoord(uv)
+
+            elif keyword == "bulb":
+                xyz = np.array(rem).astype(float)
+
+                renderer = renderer.AddBulb(xyz)
+
+            elif keyword == "shininess":
+                renderer = renderer.SetPanorama()
+
+            elif keyword == "bounces":
+                renderer = renderer.SetPanorama()
+
+            elif keyword == "transparency":
+                renderer = renderer.SetPanorama()
+
+            elif keyword == "ior":
+                renderer = renderer.SetPanorama()
+
+            elif keyword == "roughness":
+                renderer = renderer.SetPanorama()
+
+            elif keyword == "aa":
+                renderer = renderer.SetPanorama()
+
+            elif keyword == "dof":
+                renderer = renderer.SetPanorama()
+
+            elif keyword == "gi":
+                renderer = renderer.SetPanorama()
 
         renderer.RenderFrame()
         renderer.PostProcess()
@@ -72,7 +119,8 @@ def parse_file(filename):
 #   filename always ends .png
 def png(width, height):
     image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    return image        
+    return image
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:

@@ -1,4 +1,6 @@
 import numpy as np
+
+from texure_handler import get_texture_color
 from ..structures import Geometry, HitInfo, Ray
 from numpy.typing import NDArray
 
@@ -15,14 +17,13 @@ class Sphere(Geometry):
     @property
     def state(self) -> dict:
         return self._state
-        
+
     @state.setter
     def state(self, value: dict):
         self._state = value
-      
 
-    def calculate_intersection(self, ray:Ray) -> HitInfo:
-        # For clarity, let's map variables to the algorithm notation
+    def calculate_intersection(self, ray: Ray) -> HitInfo:
+        # Mapping variables to the algorithm notation
         r_o = ray.origin  # ray origin
         r_d = ray.direction  # ray direction
         c = self.position  # sphere center
@@ -32,14 +33,14 @@ class Sphere(Geometry):
         c_minus_ro = c - r_o
         inside = np.dot(c_minus_ro, c_minus_ro) < r * r
 
-        # 2. Calculate t_c = (c - r_o)·r_d / ∥r_d∥
+        # 2. Calculate t_c = (c - r_o)·r_d /2norm(r_d)
         t_c = np.dot(c_minus_ro, r_d) / np.dot(r_d, r_d)
 
         # 3. Early exit check
         if not inside and t_c < 0:
             return None
 
-        # 4. Calculate d² = ∥r_o + t_c·r_d - c∥²
+        # 4. Calculate d² = 2norm(r_o + t_c·r_d - c)
         closest_point = r_o + t_c * r_d - c
         d_squared = np.dot(closest_point, closest_point)
 
@@ -47,7 +48,7 @@ class Sphere(Geometry):
         if not inside and r * r < d_squared:
             return None
 
-        # 6. Calculate t_offset = √(r² - d²) / ∥r_d∥
+        # 6. Calculate t_offset = sqrt(r² - d²) / 2norm(r_d)
         t_offset = np.sqrt(r * r - d_squared) / np.sqrt(np.dot(r_d, r_d))
 
         # 7. Calculate intersection point and distance
@@ -60,13 +61,32 @@ class Sphere(Geometry):
         normal = (intersection - self.position) / np.linalg.norm(
             intersection - self.position
         )
-        if np.dot(normal,ray.direction)>0:
-            normal= -normal
-
+        if np.dot(normal, ray.direction) > 0:
+            normal = -normal
 
         hit = HitInfo()
         hit.distance = t
         hit.point = intersection
         hit.normal = normal
         hit.material = self
+
+        hit.color = self.getColor(hit.point)
+
         return hit
+
+    def getColor(self, point: NDArray[np.float64]):
+        texture = self.state["texture"]
+        if texture is not None:
+            # Get point relative to sphere center
+            x, y, z = point - self.position
+
+            # Longitude: angle in xz plane from x axis
+            longitude = np.arctan2(x, z) - np.pi / 2  # swap x and z
+            u = ((longitude + np.pi) / (2 * np.pi)) % 1
+
+            # Latitude: angle from y axis
+            latitude = np.arccos(y / self.r)
+            v = latitude / np.pi
+
+            return get_texture_color(texture, u, v)
+        return self.state["color"]
