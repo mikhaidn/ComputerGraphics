@@ -2,6 +2,8 @@ from PIL import Image
 import sys
 import numpy as np
 from typing import List
+
+from src.boundingbox import BVHNode
 from .structures import Geometry, LightSource, Ray
 from src.geometry.sphere import Sphere
 from src.lightsource.sun import Sun
@@ -24,6 +26,8 @@ class Renderer:
 
         self.fisheye = False
         self.panorama = False
+
+        self.bvh = None
 
     def WithWidth(self, width):
         self.width = width
@@ -48,7 +52,12 @@ class Renderer:
     def AddSphere(self, r, position):
         sphere = Sphere(r, position, self.GetStates())
         self.geometries.append(sphere)
+        self.bvh = None  # Mark BVH as needing rebuild
         return self
+    
+    def BuildBVH(self):
+        if not self.bvh and self.geometries:
+            self.bvh = BVHNode(self.geometries)
 
     def AddSun(self, position):
         sun = Sun(position, self.GetStates())
@@ -191,17 +200,13 @@ class Renderer:
         )
 
     def CalculateRayCollision(self, ray:Ray):
-        hits = [
-            g.calculate_intersection(ray)
-            for g in self.geometries
-        ]
-        valid_hits = [
-            c for c in hits if c is not None and c.distance > 0
-        ]
-        if valid_hits:
-            collision = min(valid_hits, key=lambda x: x.distance)
+        self.BuildBVH()  # Build BVH if needed
+        if not self.bvh:
+            return None
+            
+        collision =  self.bvh.intersect(ray)
 
-        else:
+        if not collision:
             return None
 
         shadow_origin = collision.point + collision.normal * self.epsilon

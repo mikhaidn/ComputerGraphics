@@ -23,6 +23,8 @@ class HitInfo:
 
 
 class Geometry(Protocol):
+    position: NDArray[np.float64]
+    
     def calculate_intersection(self, ray:Ray) -> HitInfo: ...
 
     @property 
