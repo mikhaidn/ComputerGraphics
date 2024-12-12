@@ -7,3 +7,6 @@ venv/
 *.pyc
 *.pyo
 *.pyd
+venv/lib/python3.12/site-packages/pip/__pycache__/__init__.cpython-312.pyc
+venv/lib/python3.12/site-packages/pip/*
+venv/lib/python3.12/site-packages/pip/_internal/cli/__pycache__/__init__.cpython-312.pyc
