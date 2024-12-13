@@ -20,15 +20,12 @@ class Renderer:
     def __init__(self):
         self.sRGB = True
         self.color = np.array([1, 1, 1])
-
         self.geometries: List[Geometry] = []
         self.lightSources: List[LightSource] = []
         self.vertecies: List[Vertex] = []
-
         self.epsilon = 0.00000001
         self.debug = False
         self.exposure = None
-
         self.eye = np.array([0, 0, 0])
         self.forward = np.array([0, 0, -1])
         self.right = np.array([1, 0, 0])
@@ -39,20 +36,6 @@ class Renderer:
 
         self.texcoord = (0, 0)
         self.texture = None
-
-        self.shininess = np.array([0, 0, 0])
-        self.transparency = np.array([0, 0, 0])
-        self.transparency = np.array([0, 0, 0])
-
-        self.roughness = float(0)
-        self.ior = 1.458
-
-        self.bounces = 4
-        self.antiAliasing = 1
-
-        self.focus = 0
-        self.lens = 0
-        self.globalIllumination = 0
 
     def WithWidth(self, width):
         self.width = width
@@ -155,54 +138,11 @@ class Renderer:
         self.up = u / np.linalg.norm(u)
         return self
 
-    def SetShininess(self, rgb):
-        if len(rgb) == 1:
-            r = rgb[0]
-            rgb = np.array([r, r, r])
-
-        self.shininess = rgb
-        return self
-
-    def SetBounces(self, n):
-        self.bounces = n
-        return self
-
-    def SetTransparency(self, rgb):
-        if len(rgb) == 1:
-            r = rgb[0]
-            rgb = np.array([r, r, r])
-
-        self.transparency = rgb
-        return self
-
-    def SetIor(self, nu):
-        self.ior = nu
-        return self
-
-    def SetRoughness(self, rough):
-        self.roughness = rough
-        return self
-
-    def SetAntiAliasing(self, n):
-        self.antiAliasing = n
-        return self
-
-    def SetDepthOfField(self, dof):
-        self.focus = dof[0]
-        self.lens = dof[1]
-        return self
-
-    def SetGlobalIllumination(self, d):
-        self.globalIllumination = d
-        return self
-
     def GetStates(self):
         states = {}
         states["color"] = self.color
         states["texture"] = self.texture
         states["texcoord"] = self.texcoord
-
-        states["shininess"] = self.shininess
 
         return states
 
@@ -282,48 +222,13 @@ class Renderer:
         if hitInfo:
             return self.CalculateLight(hitInfo)
 
+        # if hit - update image w/ material stuff
+        # else return background color, using cyan for now
+        # bg_color = tuple(np.asarray([0, 1, 1, 1] * 256).astype(int))
+        # print(bg_color)
         return (0, 0, 0, 0)
 
-    def CalculateReflection(self, hitInfo: HitInfo, current_depth: int) -> np.ndarray:
-        """
-        Calculate the reflection contribution with a maximum bounce depth.
-
-        Args:
-            hitInfo: Information about the ray intersection point
-            current_depth: Current recursion depth (0 for primary rays)
-
-        Returns:
-            numpy.ndarray: RGB color contribution from reflections
-        """
-        # Check if we've reached maximum bounce depth
-        if current_depth > self.bounces:
-            return np.zeros(3)
-
-        # Skip if surface isn't shiny
-        specular_color = hitInfo.shininess
-        if not np.any(specular_color > 0):
-            return np.zeros(3)
-
-        # Calculate reflection vector
-        N = hitInfo.normal
-        I = hitInfo.incident_direction
-        reflection_vector = I - 2 * np.dot(I, N) * N
-
-        reflection_direction = reflection_vector / np.linalg.norm(reflection_vector)
-        # Trace reflection ray
-        reflection_ray = Ray()
-        reflection_ray.origin = hitInfo.point + hitInfo.normal * self.epsilon
-        reflection_ray.direction = reflection_direction
-
-        reflection_hit = self.CalculateRayCollision(reflection_ray)
-        if reflection_hit is None:
-            return np.zeros(3)
-
-        # Recursive call with incremented depth
-        reflected_color = self.CalculateLight(reflection_hit, current_depth + 1)
-        return np.array(reflected_color[:3]) / 255.0 * specular_color
-
-    def CalculateLight(self, hitInfo: HitInfo, current_depth: int = 0):
+    def CalculateLight(self, hitInfo: HitInfo):
         if hitInfo is None:
             return np.zeros(3)
 
@@ -332,14 +237,6 @@ class Renderer:
         for light in self.lightSources:
             illumination = light.calculate_illumination(hitInfo, self.debug)
             total_illumination += illumination
-
-        # Add reflection contribution if we haven't reached max depth
-        if current_depth < self.bounces:
-            reflection_contribution = self.CalculateReflection(hitInfo, current_depth)
-            if reflection_contribution is None:
-                return np.zeros([0,0,0,255])
-
-            total_illumination += reflection_contribution
 
         return (
             int(total_illumination[0] * 255),

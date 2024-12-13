@@ -85,31 +85,28 @@ def parse_file(filename):
                 renderer = renderer.AddBulb(xyz)
 
             elif keyword == "shininess":
-                rgb = np.array(rem).astype(float)
-                renderer = renderer.SetShininess(rgb)
+                renderer = renderer.SetPanorama()
 
             elif keyword == "bounces":
-                renderer = renderer.SetBounces(int(rem[0]))
+                renderer = renderer.SetPanorama()
 
             elif keyword == "transparency":
-                rgb = np.array(rem).astype(float)
-                renderer = renderer.SetTransparency(rgb)
+                renderer = renderer.SetPanorama()
 
             elif keyword == "ior":
-                renderer = renderer.SetIor(float(rem[0]))
+                renderer = renderer.SetPanorama()
 
             elif keyword == "roughness":
-                renderer = renderer.SetRoughness(float(rem[0]))
+                renderer = renderer.SetPanorama()
 
             elif keyword == "aa":
-                renderer = renderer.SetAntiAliasing(int(rem[0]))
+                renderer = renderer.SetPanorama()
 
             elif keyword == "dof":
-                dof = np.array(rem).astype(float)
-                renderer = renderer.SetDepthOfField(dof)
+                renderer = renderer.SetPanorama()
 
             elif keyword == "gi":
-                renderer = renderer.SetGlobalIllumination(float(rem[0]))
+                renderer = renderer.SetPanorama()
 
         renderer.RenderFrame()
         renderer.PostProcess()

@@ -49,9 +49,7 @@ class Plane(Geometry):
         hit.point = intersection
         hit.normal = -n if np.dot(r_d, n) > 0 else n
         hit.color = self.state["color"]
-        hit.shininess = self.state["shininess"]
         hit.material = self
-        hit.incident_direction = ray.direction
         return hit
 
     def getNonZeroPoint(self, a, b, c, d):

@@ -21,9 +21,7 @@ class HitInfo:
     normal: List[float]
     point: List[float]
     color: NDArray[np.float64]
-    shininess: NDArray[np.float64]
     material: "Geometry"
-    incident_direction: NDArray[np.float64]
     in_shadow: dict
 
     def __str__(self):

@@ -33,7 +33,7 @@ class Sphere(Geometry):
         c_minus_ro = c - r_o
         inside = np.dot(c_minus_ro, c_minus_ro) < r * r
 
-        # 2. Calculate t
+        # 2. Calculate t_c = (c - r_o)·r_d /2norm(r_d)
         t_c = np.dot(c_minus_ro, r_d) / np.dot(r_d, r_d)
 
         # 3. Early exit check
@@ -69,9 +69,8 @@ class Sphere(Geometry):
         hit.point = intersection
         hit.normal = normal
         hit.material = self
-        hit.incident_direction = ray.direction
+
         hit.color = self.getColor(hit.point)
-        hit.shininess = self.state["shininess"]
 
         return hit
 
