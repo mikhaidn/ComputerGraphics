@@ -30,7 +30,7 @@ class Sun(LightSource):
         if debug:
             print(normal, light_direction, incident_dot)
 
-        # If surface is facing away from light, no illumination
+        # If surface is facing away from light, return black
         if incident_dot < 0:
             return np.zeros(3)
 

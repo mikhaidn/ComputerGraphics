@@ -17,21 +17,17 @@ class Bulb(LightSource):
         self._state = value
 
     def calculate_illumination(self, hitInfo: HitInfo, debug: bool = False):
-      
+
         vector = self.position - hitInfo.point
         distance = np.linalg.norm(vector)
         direction = vector / distance
-        # If there's a shadow intersection, check if it's behind the light
+
+        # If shadow intersection is further than light, ignore it
         if hitInfo.in_shadow.get(self, False):
-            # Get the distance to the shadow-casting object
             shadow_distance = hitInfo.in_shadow.get(self)
-            # If shadow intersection is further than light, ignore it
-            if shadow_distance > distance:
-                pass  # Continue with illumination calculation
-            else:
-                return np.zeros(3)  # Object is truly in shadow
-
-
+            if shadow_distance <= distance:
+                # Object is in shadow
+                return np.zeros(3)
 
         normal = hitInfo.normal
         incident_dot = np.dot(normal, direction)
@@ -39,7 +35,7 @@ class Bulb(LightSource):
         if debug:
             print(normal, direction, incident_dot)
 
-        # If surface is facing away from light, no illumination
+        # If surface is facing away from light, return black
         if incident_dot < 0:
             return np.zeros(3)
 
@@ -48,10 +44,10 @@ class Bulb(LightSource):
             normal = -normal
             incident_dot = -incident_dot
 
-        # Calculate light intensity based on inverse square law
+        # Calculate light via inverse square
         intensity = 1.0 / (distance**2)
 
-        # Combine color, light color, incidence angle, and distance-based intensity
+        # Combine colors, angle, and intensity
         return hitInfo.color * self.state["color"] * incident_dot * intensity
 
     def get_direction_from_point(self, point: NDArray[np.float64]):

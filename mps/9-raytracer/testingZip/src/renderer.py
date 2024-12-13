@@ -20,12 +20,15 @@ class Renderer:
     def __init__(self):
         self.sRGB = True
         self.color = np.array([1, 1, 1])
+
         self.geometries: List[Geometry] = []
         self.lightSources: List[LightSource] = []
         self.vertecies: List[Vertex] = []
+
         self.epsilon = 0.00000001
         self.debug = False
         self.exposure = None
+
         self.eye = np.array([0, 0, 0])
         self.forward = np.array([0, 0, -1])
         self.right = np.array([1, 0, 0])
@@ -36,6 +39,20 @@ class Renderer:
 
         self.texcoord = (0, 0)
         self.texture = None
+
+        self.shininess = np.array([0, 0, 0])
+        self.transparency = np.array([0, 0, 0])
+        self.transparency = np.array([0, 0, 0])
+
+        self.roughness = float(0)
+        self.ior = 1.458
+
+        self.bounces = 4
+        self.antiAliasing = 1
+
+        self.focus = 0
+        self.lens = 0
+        self.globalIllumination = 0
 
     def WithWidth(self, width):
         self.width = width
@@ -138,11 +155,57 @@ class Renderer:
         self.up = u / np.linalg.norm(u)
         return self
 
+    def SetShininess(self, rgb):
+        if len(rgb) == 1:
+            r = rgb[0]
+            rgb = np.array([r, r, r])
+
+        self.shininess = rgb
+        return self
+
+    def SetBounces(self, n):
+        self.bounces = n
+        return self
+
+    def SetTransparency(self, rgb):
+        if len(rgb) == 1:
+            r = rgb[0]
+            rgb = np.array([r, r, r])
+
+        self.transparency = rgb
+        return self
+
+    def SetIor(self, nu):
+        self.ior = nu
+        return self
+
+    def SetRoughness(self, rough):
+        self.roughness = rough
+        return self
+
+    def SetAntiAliasing(self, n):
+        self.antiAliasing = n
+        return self
+
+    def SetDepthOfField(self, dof):
+        self.focus = dof[0]
+        self.lens = dof[1]
+        return self
+
+    def SetGlobalIllumination(self, d):
+        self.globalIllumination = d
+        return self
+
     def GetStates(self):
         states = {}
         states["color"] = self.color
         states["texture"] = self.texture
         states["texcoord"] = self.texcoord
+
+        states["shininess"] = self.shininess
+        states["ior"] = self.ior
+        states["transparency"] = self.transparency
+        states["roughness"] = self.roughness
 
         return states
 
@@ -150,11 +213,37 @@ class Renderer:
         maxWidthOrHeight = max(self.width, self.height)
         for i in range(self.width):
             for j in range(self.height):
-                eye, ray_direction = self.EmitRayFromIndex(maxWidthOrHeight, i, j)
+                accumulated_rgb = np.zeros(3)
+                accumulated_alpha = 0
+                n = self.antiAliasing
 
-                incomingLight = self.Trace(eye, ray_direction)
+                for _ in range(n):
+                    if n > 1:
+                        # Add jittered offsets
+                        dx = (np.random.random() - 0.5) / maxWidthOrHeight
+                        dy = (np.random.random() - 0.5) / maxWidthOrHeight
+                    else:
+                        dx, dy = (
+                            0,
+                            0,
+                        )  # for backwards compatibility, don't do this the first time
 
-                self.image.putpixel((i, j), incomingLight)
+                    eye, ray_direction = self.EmitRayFromIndex(
+                        maxWidthOrHeight, i + dx, j + dy
+                    )
+
+                    color = self.Trace(eye, ray_direction)
+                    color_array = np.array(color)
+
+                    accumulated_rgb += color_array[:3]
+                    accumulated_alpha += color_array[3]
+
+                # I can't figure out the boundary thing :/
+                final_rgb = accumulated_rgb / n
+                final_alpha = accumulated_alpha / n
+                final_color = (*[int(c) for c in final_rgb], int(final_alpha))
+
+                self.image.putpixel((i, j), final_color)
 
     def EmitRayFromIndex(self, maxWidthOrHeight: float, i: float, j: float):
 
@@ -167,14 +256,16 @@ class Renderer:
         )
 
         if self.panorama:
-            longitude = (2 * i - self.width) * np.pi / self.width  # -π to π
-            latitude = (self.height - 2 * j) * np.pi / (2 * self.height)  # -π/2 to π/2
+            longitude = (2 * i - self.width) * np.pi / self.width  # -pi to pi
+            latitude = (
+                (self.height - 2 * j) * np.pi / (2 * self.height)
+            )  # -pi/2 to pi/2
 
             s = np.array(
                 [
-                    np.cos(latitude) * np.sin(longitude),  # x
-                    np.sin(latitude),  # y
-                    np.cos(latitude) * np.cos(longitude),  # z
+                    np.cos(latitude) * np.sin(longitude),
+                    np.sin(latitude),
+                    np.cos(latitude) * np.cos(longitude),
                 ]
             )
 
@@ -192,12 +283,34 @@ class Renderer:
             if sum_of_squares > 1:
                 return None, None
 
-            # Modify the forward component for this ray only
+            # Modify only the forward component
             f = f * np.sqrt(1 - sum_of_squares)
 
         # Sum all terms and normaize
         ray_direction = f * s_z + s_x * r + s_y * u
         ray_direction /= np.linalg.norm(ray_direction)
+
+
+        # Depth of field
+        if self.lens > 0 and self.focus > 0:
+            # Calculate focal point
+            focal_point = self.eye + ray_direction * self.focus
+
+            # Generate random point on lens
+            theta = np.random.random() * 2 * np.pi
+            radius = np.random.random() * self.lens
+
+            # Calculate offset on lens plane
+            lens_offset = radius * (
+                np.cos(theta) * self.right + np.sin(theta) * self.up
+            )
+
+            # Update ray origin and direction
+            new_origin = self.eye + lens_offset
+            new_direction = focal_point - new_origin
+            new_direction = new_direction / np.linalg.norm(new_direction)
+
+            return new_origin, new_direction
 
         # self.debug = False
         # if i == 55 and j == 45:
@@ -222,21 +335,133 @@ class Renderer:
         if hitInfo:
             return self.CalculateLight(hitInfo)
 
-        # if hit - update image w/ material stuff
-        # else return background color, using cyan for now
-        # bg_color = tuple(np.asarray([0, 1, 1, 1] * 256).astype(int))
-        # print(bg_color)
         return (0, 0, 0, 0)
 
-    def CalculateLight(self, hitInfo: HitInfo):
+    def CalculateTransparency(self, hitInfo: HitInfo, current_depth: int) -> np.ndarray:
+        """
+        Calculate the transparency contribution with refraction through objects.
+        """
+        if current_depth > self.bounces or not np.any(hitInfo.transparency > 0):
+            return np.zeros(3)
+
+        N = hitInfo.normal
+        I = hitInfo.incident_direction
+        n1 = 1.0
+        n2 = hitInfo.refraction_index
+
+        a = -np.dot(N, I)
+        b = 1 - (n1 / n2) ** 2 * (1 - a**2)
+
+        # 'not' step 3
+        if b < 0:
+            return np.zeros(3)
+
+        c = np.sqrt(b)
+        refraction_direction = (n1 / n2) * I + ((n1 / n2) * a - c) * N
+        refraction_direction = refraction_direction / np.linalg.norm(
+            refraction_direction
+        )
+
+        # Trace through object to find exit point
+        entry_ray = Ray()
+        entry_ray.origin = hitInfo.point - N * self.epsilon
+        entry_ray.direction = refraction_direction
+
+        exit_hit = self.CalculateRayCollision(entry_ray)
+        if exit_hit is None or exit_hit.material != hitInfo.material:
+            return np.zeros(3)
+
+        # Find outward refraction direction
+        N_exit = exit_hit.normal
+        I_exit = entry_ray.direction
+        n1, n2 = n2, n1  # Swap indices for exit
+
+        a_exit = -np.dot(N_exit, I_exit)
+        b_exit = 1 - (n1 / n2) ** 2 * (1 - a_exit**2)
+
+        if b_exit < 0:
+            return np.zeros(3)
+
+        c_exit = np.sqrt(b_exit)
+        refraction_direction_exit = (n1 / n2) * I_exit + (
+            (n1 / n2) * a_exit - c_exit
+        ) * N_exit
+        refraction_direction_exit = refraction_direction_exit / np.linalg.norm(
+            refraction_direction_exit
+        )
+
+        # Continue ray trace from exit point
+        exit_ray = Ray()
+        exit_ray.origin = exit_hit.point - N_exit * self.epsilon
+        exit_ray.direction = refraction_direction_exit
+
+        final_hit = self.CalculateRayCollision(exit_ray)
+        if final_hit is None:
+            return np.zeros(3)
+
+        refracted_color = self.CalculateLight(final_hit, current_depth + 1)
+        return np.array(refracted_color[:3]) / 255.0 * hitInfo.transparency
+
+    def CalculateReflection(self, hitInfo: HitInfo, current_depth: int) -> np.ndarray:
+        """
+        Calculate the reflection contribution with a maximum bounce depth.
+        """
+        # If bounce depth is reached, return black
+        if current_depth > self.bounces:
+            return np.zeros(3)
+
+        # If surfance isn't shiny, return black
+        specular_color = hitInfo.shininess
+        if not np.any(specular_color > 0):
+            return np.zeros(3)
+
+        # Calculate reflection vector
+        N = hitInfo.normal
+        I = hitInfo.incident_direction
+        reflection_vector = I - 2 * np.dot(I, N) * N
+
+        reflection_direction = reflection_vector / np.linalg.norm(reflection_vector)
+
+        # Trace reflection ray
+        reflection_ray = Ray()
+        reflection_ray.origin = hitInfo.point + hitInfo.normal * self.epsilon
+        reflection_ray.direction = reflection_direction
+
+        reflection_hit = self.CalculateRayCollision(reflection_ray)
+        if reflection_hit is None:
+            return np.zeros(3)
+
+        # recurse with depth +1
+        reflected_color = self.CalculateLight(reflection_hit, current_depth + 1)
+        return np.array(reflected_color[:3]) / 255.0 * specular_color
+
+    def CalculateLight(self, hitInfo: HitInfo, current_depth: int = 0):
         if hitInfo is None:
             return np.zeros(3)
 
-        # Calculate illumination from all light sources and sum them
+        # Sum all light sources
         total_illumination = np.zeros(3)
         for light in self.lightSources:
             illumination = light.calculate_illumination(hitInfo, self.debug)
             total_illumination += illumination
+
+        # Calculate reflection and refraction until depth
+        if current_depth < self.bounces:
+            reflection_contribution = self.CalculateReflection(hitInfo, current_depth)
+            transparency_contribution = self.CalculateTransparency(
+                hitInfo, current_depth
+            )
+
+            # Blend between direct illumination, reflection, and transparency
+            shininess = hitInfo.shininess
+            transparency = hitInfo.transparency
+            opacity = 1 - transparency
+
+            total_illumination = (
+                total_illumination * opacity * (1 - shininess)  # Direct illumination
+                + reflection_contribution * opacity  # Reflection
+                + transparency_contribution  # Refraction
+            )
 
         return (
             int(total_illumination[0] * 255),

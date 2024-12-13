@@ -28,8 +28,8 @@ class Plane(Geometry):
 
     def calculate_intersection(self, ray: Ray) -> HitInfo:
         # Mapping variables to the algorithm notation
-        r_o = ray.origin  # ray origin
-        r_d = ray.direction  # ray direction
+        r_o = ray.origin
+        r_d = ray.direction
         p = self.point
         n = self.normal
 
@@ -49,7 +49,15 @@ class Plane(Geometry):
         hit.point = intersection
         hit.normal = -n if np.dot(r_d, n) > 0 else n
         hit.color = self.state["color"]
+        hit.shininess = self.state["shininess"]
+        hit.refraction_index = self.state["ior"]
+        hit.transparency = self.state["transparency"]
+        hit.roughness = self.state["roughness"]
         hit.material = self
+        hit.incident_direction = ray.direction
+
+        hit.add_noise_to_normal(hit.roughness)
+
         return hit
 
     def getNonZeroPoint(self, a, b, c, d):

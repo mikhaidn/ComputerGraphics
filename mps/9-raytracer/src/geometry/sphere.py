@@ -24,10 +24,10 @@ class Sphere(Geometry):
 
     def calculate_intersection(self, ray: Ray) -> HitInfo:
         # Mapping variables to the algorithm notation
-        r_o = ray.origin  # ray origin
-        r_d = ray.direction  # ray direction
-        c = self.position  # sphere center
-        r = self.r  # sphere radius
+        r_o = ray.origin
+        r_d = ray.direction
+        c = self.position
+        r = self.r
 
         # 1. Check if origin is inside sphere
         c_minus_ro = c - r_o
@@ -40,7 +40,7 @@ class Sphere(Geometry):
         if not inside and t_c < 0:
             return None
 
-        # 4. Calculate d² = 2norm(r_o + t_c·r_d - c)
+        # 4. Calculate distance norm
         closest_point = r_o + t_c * r_d - c
         d_squared = np.dot(closest_point, closest_point)
 
@@ -48,7 +48,7 @@ class Sphere(Geometry):
         if not inside and r * r < d_squared:
             return None
 
-        # 6. Calculate t_offset = sqrt(r² - d²) / 2norm(r_d)
+        # 6. Calculate t_offset
         t_offset = np.sqrt(r * r - d_squared) / np.sqrt(np.dot(r_d, r_d))
 
         # 7. Calculate intersection point and distance
@@ -72,6 +72,11 @@ class Sphere(Geometry):
         hit.incident_direction = ray.direction
         hit.color = self.getColor(hit.point)
         hit.shininess = self.state["shininess"]
+        hit.refraction_index = self.state["ior"]
+        hit.transparency = self.state["transparency"]
+        hit.roughness = self.state["roughness"]
+
+        hit.add_noise_to_normal(hit.roughness)
 
         return hit
 
