@@ -320,9 +320,13 @@ def dda(a, b, dim_index):
 
 
 def linear_to_srgb(linear):
-    return np.where(
-        linear < 0.0031308, linear * 12.92, 1.055 * (linear ** (1 / 2.4)) - 0.055
+    linear = np.clip(linear, 0.0, 1.0)
+
+    srgb_array = np.where(
+        linear <= 0.0031308, linear * 12.92, 1.055 * (linear ** (1 / 2.4)) - 0.055
     )
+
+    return np.clip(srgb_array, 0.0, 1.0)
 
 
 def convert_linear_to_srgb(img):

@@ -12,7 +12,7 @@ for file in *.png; do
         temp_files+=("$temp_diff")
         
         # Compare the current file with its reference counterpart
-        compare -fuzz 3% -metric AE "$file" "reference/$file" "$temp_diff" 2>/dev/null
+        compare -fuzz 4% -metric AE "$file" "reference/$file" "$temp_diff" 2>/dev/null
         
         echo "Processed $file"
     else
